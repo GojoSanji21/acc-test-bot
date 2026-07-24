@@ -1,0 +1,11 @@
+# Place SOCKS5 proxies here, one per line.
+# Supported formats:
+# 1. socks5://user:pass@host:port
+# 2. socks5://host:port
+# 3. host:port:user:pass
+# 4. host:port
+#
+# Examples:
+# socks5://admin:pass123@192.168.1.100:1080
+# 192.168.1.101:1080:myuser:mypass
+# 192.168.1.102:1080
