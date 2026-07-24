@@ -224,98 +224,8 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                             all_found_files.append((p.name, file_size))
 
                             if p.suffix.lower() == ".session":
-                                # It's a SQLite session file!
-                                try:
-                                    session_db_name = p.stem
-                                    file_storage = FileStorage(session_db_name, p.parent)
-                                    await file_storage.open()
-
-                                    dc_id = await file_storage.dc_id()
-                                    api_id = await file_storage.api_id()
-                                    test_mode = await file_storage.test_mode()
-                                    auth_key = await file_storage.auth_key()
-                                    user_id = await file_storage.user_id()
-                                    is_bot = await file_storage.is_bot()
-                                    date = await file_storage.date()
-
-                                    await file_storage.close()
-
-                                    mem_storage = MemoryStorage(session_db_name)
-                                    await mem_storage.open()
-                                    await mem_storage.dc_id(dc_id)
-                                    await mem_storage.api_id(api_id)
-                                    await mem_storage.test_mode(test_mode)
-                                    await mem_storage.auth_key(auth_key)
-                                    await mem_storage.user_id(user_id)
-                                    await mem_storage.is_bot(is_bot)
-                                    await mem_storage.date(date)
-
-                                    temp_session_str = await mem_storage.export_session_string()
-                                    await mem_storage.close()
-
-                                    if temp_session_str:
-                                        sessions_to_import.append((temp_session_str, p.name))
-                                except Exception as db_err:
-                                    logger.error(f"Failed to parse SQLite session file {p.name} from ZIP: {db_err}. Falling back to direct SQLite query...")
-                                    parsing_errors.append(f"{p.name} (SQLite err: {str(db_err)[:40]})")
-
-                                    # Fallback 1: Direct SQLite query for dc_id and auth_key (supports Pyrogram & Telethon schemas)
-                                    recovered_via_sql = False
-                                    try:
-                                        import sqlite3
-                                        import struct
-                                        import base64
-                                        conn = sqlite3.connect(str(p))
-                                        cursor = conn.cursor()
-
-                                        # Get all tables
-                                        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-                                        tables = [row[0] for row in cursor.fetchall()]
-
-                                        for table in ["sessions", "session"]:
-                                            if table in tables:
-                                                cursor.execute(f"PRAGMA table_info({table})")
-                                                columns = [col[1] for col in cursor.fetchall()]
-                                                if "dc_id" in columns and "auth_key" in columns:
-                                                    cursor.execute(f"SELECT dc_id, auth_key FROM {table} LIMIT 1")
-                                                    row = cursor.fetchone()
-                                                    if row:
-                                                        dc_id, auth_key = row
-                                                        if auth_key and len(auth_key) == 256:
-                                                            # Pack into standard Pyrogram session string format: '>BI?256sQ?'
-                                                            packed = struct.pack(
-                                                                '>BI?256sQ?',
-                                                                dc_id,
-                                                                0,      # api_id
-                                                                False,  # test_mode
-                                                                auth_key,
-                                                                0,      # user_id
-                                                                False   # is_bot
-                                                            )
-                                                            temp_session_str = base64.urlsafe_b64encode(packed).decode().rstrip("=")
-                                                            sessions_to_import.append((temp_session_str, p.name))
-                                                            parsing_errors.append(f"{p.name} (recovered via direct SQL fallback!)")
-                                                            recovered_via_sql = True
-                                                            break
-                                        conn.close()
-                                    except Exception as sql_fallback_err:
-                                        logger.error(f"Direct SQLite query fallback failed for {p.name}: {sql_fallback_err}")
-
-                                    if not recovered_via_sql:
-                                        # Fallback 2: try to read as a text file
-                                        try:
-                                            with open(p, "r", encoding="utf-8", errors="ignore") as f:
-                                                content = f.read()
-                                            found_strings = re.findall(r"[a-zA-Z0-9+\-_=/]{100,}", content)
-                                            if found_strings:
-                                                for s in found_strings:
-                                                    sessions_to_import.append((s, p.name))
-                                                parsing_errors.append(f"{p.name} (recovered via text fallback!)")
-                                            else:
-                                                parsing_errors.append(f"{p.name} (no session found in fallback)")
-                                        except Exception as fallback_err:
-                                            logger.error(f"Fallback text parsing failed for {p.name}: {fallback_err}")
-                                            parsing_errors.append(f"{p.name} (fallback err: {str(fallback_err)[:40]})")
+                                # Treat as a physical file, don't try to read it
+                                sessions_to_import.append(("file", p.stem, p.name, str(p.parent)))
                             else:
                                 # Treat any non-.session file as a text candidate to find potential session strings
                                 try:
@@ -326,7 +236,7 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                                     found_strings = re.findall(r"[a-zA-Z0-9+\-_=/]{100,}", content)
                                     if found_strings:
                                         for s in found_strings:
-                                            sessions_to_import.append((s, p.name))
+                                            sessions_to_import.append(("string", s, p.name, None))
                                     else:
                                         parsing_errors.append(f"{p.name} (no session string found)")
                                 except Exception as txt_err:
@@ -362,13 +272,16 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                         )
                         return
 
-                    # Deduplicate sessions_to_import based on session_string
+                    # Deduplicate sessions_to_import based on session data
                     unique_sessions = []
                     seen_strings = set()
-                    for s_str, s_name in sessions_to_import:
-                        if s_str not in seen_strings:
-                            seen_strings.add(s_str)
-                            unique_sessions.append((s_str, s_name))
+                    for s_type, s_data, s_name, s_workdir in sessions_to_import:
+                        # For files, deduplicate by the full path (s_workdir + s_data)
+                        # For strings, deduplicate by the string itself
+                        dedup_key = f"{s_workdir}/{s_data}" if s_type == "file" else s_data
+                        if dedup_key not in seen_strings:
+                            seen_strings.add(dedup_key)
+                            unique_sessions.append((s_type, s_data, s_name, s_workdir))
 
                     success_count = 0
                     expired_sessions = []  # list of tuples: (source_name, error_reason)
@@ -387,8 +300,7 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                         pct = int((current / total) * 100)
                         return f"<code>[{bar}]</code> <b>{pct}%</b>"
 
-                    for i, (session_str_item, source_name) in enumerate(unique_sessions, 1):
-                        session_str_item = normalize_session_string(session_str_item)
+                    for i, (s_type, s_data, source_name, s_workdir) in enumerate(unique_sessions, 1):
                         # Throttle live updates to prevent hitting Telegram API rate limits (flood waits)
                         now_time = time.time()
                         if i == 1 or i == total_sessions or (now_time - last_edit_time >= 1.5):
@@ -410,7 +322,20 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
 
                         proxy, proxy_error = get_random_proxy()
                         temp_name = f"uploaded_sess_zip_{message.from_user.id}_{i}"
-                        client = create_pyrogram_client(session_name=temp_name, session_string=session_str_item, proxy=proxy)
+
+                        if s_type == "file":
+                            # For physical files, initialize client directly with workdir
+                            client = Client(
+                                name=s_data,
+                                api_id=API_ID,
+                                api_hash=API_HASH,
+                                workdir=s_workdir,
+                                proxy=proxy
+                            )
+                        else:
+                            # For strings, normalize and use existing helper
+                            s_data = normalize_session_string(s_data)
+                            client = create_pyrogram_client(session_name=temp_name, session_string=s_data, proxy=proxy)
 
                         try:
                             await client.connect()
@@ -432,8 +357,11 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                             name_parts = [first, last]
                             profile_name = " ".join([p for p in name_parts if p.strip()]) or me.username or "ᴜɴᴋɴᴏᴡɴ"
 
+                            # Get session string to store it uniformly in DB
+                            exported_session_str = await client.export_session_string()
+
                             # Encrypt and save securely
-                            encrypted_session = encrypt_data(session_str_item)
+                            encrypted_session = encrypt_data(exported_session_str)
                             await client.disconnect()
 
                             saved = await save_account(
