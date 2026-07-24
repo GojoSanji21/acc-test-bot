@@ -22,5 +22,6 @@
 from .security import encrypt_data, decrypt_data
 from .session import (
     get_random_proxy,
-    create_pyrogram_client
+    create_pyrogram_client,
+    normalize_session_string
 )
