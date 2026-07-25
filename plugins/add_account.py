@@ -401,15 +401,64 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
 
                     proxy, proxy_error = get_random_proxy()
 
-                    client = Client(
-                        name=session_db_name,
-                        api_id=API_ID,
-                        api_hash=API_HASH,
-                        workdir=str(temp_dir),
-                        proxy=proxy
-                    )
+                    client = None
+                    try:
+                        client = Client(
+                            name=session_db_name,
+                            api_id=API_ID,
+                            api_hash=API_HASH,
+                            workdir=str(temp_dir),
+                            proxy=proxy
+                        )
+                        await client.connect()
+                    except Exception as e:
+                        if "no such column: number" in str(e) or "no such column" in str(e):
+                            if client:
+                                try:
+                                    await client.disconnect()
+                                except:
+                                    pass
 
-                    await client.connect()
+                            import sqlite3
+                            import struct
+                            import base64
+
+                            # It's likely a Telethon session. Attempt manual extraction.
+                            row = None
+                            with sqlite3.connect(dest_path) as conn:
+                                cursor = conn.cursor()
+                                cursor.execute("SELECT dc_id, server_address, port, auth_key FROM sessions")
+                                row = cursor.fetchone()
+
+                            if row:
+                                dc_id, server_address, port, auth_key = row
+
+                                # Pack it into Pyrogram base64 string
+                                pyro_packed = struct.pack(
+                                    '>BI?256sQ?',
+                                    dc_id,
+                                    API_ID,
+                                    False,
+                                    auth_key,
+                                    0,
+                                    False
+                                )
+                                session_str = base64.urlsafe_b64encode(pyro_packed).decode().rstrip("=")
+
+                                temp_name = f"sess_telethon_{message.from_user.id}"
+                                client = Client(
+                                    name=temp_name,
+                                    api_id=API_ID,
+                                    api_hash=API_HASH,
+                                    session_string=session_str,
+                                    workdir=str(temp_dir),
+                                    proxy=proxy
+                                )
+                                await client.connect()
+                            else:
+                                raise ValueError("Could not find session data in SQLite file.")
+                        else:
+                            raise e
                     me = await client.get_me()
 
                     if not me:

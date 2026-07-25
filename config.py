@@ -1,3 +1,5 @@
+from dotenv import load_dotenv
+load_dotenv()
 # =====================================================================================##
 #
 #  ██╗░░██╗███╗░░██╗██████╗░░█████╗░████████╗███████╗██████╗░
@@ -30,7 +32,7 @@ logger = logging.getLogger("TGStorageBot")
 
 # Load environment variables
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8786489572:AAE9kcahP_0FBD8J5u6wO8fDNvmYJXS8o6w")
-API_ID = int(os.getenv("API_ID", "39800351")) if os.getenv("API_ID") else 0
+API_ID = int(os.getenv("API_ID", "39800351"))
 API_HASH = os.getenv("API_HASH", "2a6fbe5d5c92adf1b49f9667be3598c3")
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
 
