@@ -34,7 +34,7 @@ logger = logging.getLogger("TGStorageBot")
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8786489572:AAE9kcahP_0FBD8J5u6wO8fDNvmYJXS8o6w")
 API_ID = int(os.getenv("API_ID", "39800351"))
 API_HASH = os.getenv("API_HASH", "2a6fbe5d5c92adf1b49f9667be3598c3")
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://ArruBhai:NVPavPk34HtQ6RW1@cluster0.hhlnxa9.mongodb.net/?appName=Cluster0")
 
 # Parse Owner ID
 OWNER_ID = int(os.getenv("OWNER_ID", "6360979950"))
