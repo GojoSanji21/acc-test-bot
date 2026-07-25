@@ -395,70 +395,59 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
             elif file_name.lower().endswith(".session"):
                 status_msg = await message.answer("⚙️ ᴘᴀʀsɪɴɢ sǫʟɪᴛᴇ <code>.session</code> ꜰɪʟᴇ...", parse_mode="HTML")
                 try:
-                    # In order to read .session SQLite database directly
-                    # Session name must match the filename without extension
                     session_db_name = dest_path.stem
-
                     proxy, proxy_error = get_random_proxy()
 
-                    client = None
-                    try:
+                    import sqlite3
+                    import struct
+                    import base64
+
+                    row = None
+                    user_id_ent = 0
+
+                    # 1. Stop Pyrogram from connecting to the file natively
+                    # 2. Read manually with sqlite3
+                    with sqlite3.connect(dest_path) as conn:
+                        cursor = conn.cursor()
+                        # 3. Extract Data
+                        cursor.execute("SELECT dc_id, server_address, port, auth_key FROM sessions")
+                        row = cursor.fetchone()
+
+                        try:
+                            cursor.execute("SELECT id FROM entities")
+                            ent_row = cursor.fetchone()
+                            if ent_row:
+                                user_id_ent = ent_row[0]
+                        except Exception:
+                            pass
+
+                    if row:
+                        dc_id, server_address, port, auth_key = row
+
+                        # 4. Pack into Pyrogram V2 String
+                        pyro_packed = struct.pack(
+                            '>BI?256sQ?',
+                            dc_id,
+                            API_ID,
+                            False,
+                            auth_key,
+                            user_id_ent,
+                            False
+                        )
+                        session_str = base64.urlsafe_b64encode(pyro_packed).decode().rstrip("=")
+
+                        # 5. Initialize
+                        temp_name = f"sess_telethon_{message.from_user.id}"
                         client = Client(
-                            name=session_db_name,
+                            name=":memory:",
                             api_id=API_ID,
                             api_hash=API_HASH,
-                            workdir=str(temp_dir),
+                            session_string=session_str,
                             proxy=proxy
                         )
                         await client.connect()
-                    except Exception as e:
-                        if "no such column: number" in str(e) or "no such column" in str(e):
-                            if client:
-                                try:
-                                    await client.disconnect()
-                                except:
-                                    pass
-
-                            import sqlite3
-                            import struct
-                            import base64
-
-                            # It's likely a Telethon session. Attempt manual extraction.
-                            row = None
-                            with sqlite3.connect(dest_path) as conn:
-                                cursor = conn.cursor()
-                                cursor.execute("SELECT dc_id, server_address, port, auth_key FROM sessions")
-                                row = cursor.fetchone()
-
-                            if row:
-                                dc_id, server_address, port, auth_key = row
-
-                                # Pack it into Pyrogram base64 string
-                                pyro_packed = struct.pack(
-                                    '>BI?256sQ?',
-                                    dc_id,
-                                    API_ID,
-                                    False,
-                                    auth_key,
-                                    0,
-                                    False
-                                )
-                                session_str = base64.urlsafe_b64encode(pyro_packed).decode().rstrip("=")
-
-                                temp_name = f"sess_telethon_{message.from_user.id}"
-                                client = Client(
-                                    name=temp_name,
-                                    api_id=API_ID,
-                                    api_hash=API_HASH,
-                                    session_string=session_str,
-                                    workdir=str(temp_dir),
-                                    proxy=proxy
-                                )
-                                await client.connect()
-                            else:
-                                raise ValueError("Could not find session data in SQLite file.")
-                        else:
-                            raise e
+                    else:
+                        raise ValueError("Could not find session data in SQLite file.")
                     me = await client.get_me()
 
                     if not me:
