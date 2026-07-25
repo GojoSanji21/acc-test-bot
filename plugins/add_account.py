@@ -85,14 +85,8 @@ def parse_sqlite_to_pyrogram_string(db_path: str, fallback_api_id: int) -> str:
                 raise ValueError("Telethon sessions table is empty.")
             dc_id, auth_key = row
             
-            user_id = 9999
-            try:
-                cursor.execute("SELECT id FROM entities")
-                ent_row = cursor.fetchone()
-                if ent_row:
-                    user_id = ent_row[0]
-            except Exception:
-                pass
+            # FIX: Use a dummy user_id to prevent "int too large" error caused by negative group IDs in Telethon.
+            user_id = 9999 
                 
             pyro_packed = struct.pack('>BI?256sQ?', dc_id, fallback_api_id, False, auth_key, user_id, False)
             return base64.urlsafe_b64encode(pyro_packed).decode().rstrip("=")
@@ -103,6 +97,8 @@ def parse_sqlite_to_pyrogram_string(db_path: str, fallback_api_id: int) -> str:
             if not row:
                 raise ValueError("Pyrogram sessions table is empty.")
             dc_id, api_id, test_mode, auth_key, user_id, is_bot = row
+            
+            user_id = abs(int(user_id)) if user_id else 9999
             
             pyro_packed = struct.pack('>BI?256sQ?', dc_id, int(api_id) if api_id else fallback_api_id, bool(test_mode), auth_key, user_id, bool(is_bot))
             return base64.urlsafe_b64encode(pyro_packed).decode().rstrip("=")
@@ -191,7 +187,7 @@ async def cancel_add_callback(callback_query: CallbackQuery, state: FSMContext):
             logger.error(f"Error disconnecting client on cancel: {e}")
     await state.clear()
     await callback_query.message.edit_text(
-        "❌ <b>ᴀᴄᴛɪᴏɴ ᴄᴀɴᴄᴇʟʟᴇᴅ sᴜᴄssꜰᴜʟʟʏ.</b>",
+        "❌ <b>ᴀᴄᴛɪᴏɴ ᴄᴀɴᴄᴇʟʟᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ.</b>",
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ᴍᴀɪɴ ᴍᴇɴᴜ", callback_data="menu:main")]
@@ -260,7 +256,7 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                             file_size = p.stat().st_size if p.exists() else 0
                             all_found_files.append((p.name, file_size))
                             if p.suffix.lower() == ".session":
-                                # Treat as a physical file, don't try to read it yet
+                                # Treat as a physical file, don't try to read it
                                 sessions_to_import.append(("file", p.stem, p.name, str(p.parent)))
                             else:
                                 # Treat any non-.session file as a text candidate to find potential session strings
