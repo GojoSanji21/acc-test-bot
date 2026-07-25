@@ -34,7 +34,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, CallbackQuery, FSInputFile
 
 from database import delete_account, get_all_accounts, get_account, save_account
-from helpers import decrypt_data, create_pyrogram_client, encrypt_data
+from helpers import decrypt_data, create_pyrogram_client, encrypt_data, pyrogram_to_telethon
 
 from pyrogram import raw
 from pyrogram.storage.file_storage import FileStorage
@@ -658,14 +658,20 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
         session_str = decrypt_data(acc["encrypted_session"])
         p_name = acc.get("profile_name") or "ᴜɴᴋɴᴏᴡɴ"
 
+        telethon_str = pyrogram_to_telethon(session_str)
+        if not telethon_str:
+            telethon_str = "Error converting to Telethon format."
+
         extract_text = (
             "━━━━━━━━━━━━━━━━━━━━━\n"
             "🔑 <b>sᴇssɪᴏɴ ᴇxᴛʀᴀᴄᴛɪᴏɴ</b>\n"
             "━━━━━━━━━━━━━━━━━━━━━\n"
             f"📱 <b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>\n"
             f"👤 <b>ᴀᴄᴄᴏᴜɴᴛ:</b> <code>{html.escape(p_name)}</code>\n\n"
-            "👇 <b><b>ᴄᴏᴘʏ-ꜰʀɪᴇɴᴅʟʏ sᴇssɪᴏɴ sᴛʀɪɴɢ:</b></b>\n"
-            f"<code>{html.escape(session_str)}</code>"
+            "👇 <b><b>Pyrogram sᴇssɪᴏɴ sᴛʀɪɴɢ (V2):</b></b>\n"
+            f"<code>{html.escape(session_str)}</code>\n\n"
+            "👇 <b><b>Telethon sᴇssɪᴏɴ sᴛʀɪɴɢ:</b></b>\n"
+            f"<code>{html.escape(telethon_str)}</code>"
         )
         await callback_query.message.edit_text(
             extract_text,
@@ -1255,7 +1261,10 @@ async def bulk_export_handler(callback_query: CallbackQuery):
             for acc in accounts:
                 phone = acc.get("phone")
                 session_str = decrypt_data(acc["encrypted_session"])
-                consolidated_lines.append(f"{phone}: {session_str}")
+                telethon_str = pyrogram_to_telethon(session_str)
+                if not telethon_str:
+                    telethon_str = "Error converting to Telethon format."
+                consolidated_lines.append(f"{phone}: {session_str} | {telethon_str}")
 
             with open(txt_path, "w", encoding="utf-8") as f:
                 f.write("\n".join(consolidated_lines))
@@ -1366,15 +1375,18 @@ async def bulk_export_handler(callback_query: CallbackQuery):
             for acc in accounts:
                 phone = acc.get("phone")
                 session_str = decrypt_data(acc["encrypted_session"])
+                telethon_str = pyrogram_to_telethon(session_str)
+                if not telethon_str:
+                    telethon_str = "Error converting to Telethon format."
 
                 name_clean = phone.replace("+", "")
 
                 # Create individual text file
                 ind_txt_path = temp_dir / f"{name_clean}.txt"
                 with open(ind_txt_path, "w", encoding="utf-8") as ind_f:
-                    ind_f.write(session_str)
+                    ind_f.write(f"Pyrogram: {session_str}\nTelethon: {telethon_str}")
 
-                consolidated_lines.append(f"{phone}: {session_str}")
+                consolidated_lines.append(f"{phone}: {session_str} | {telethon_str}")
 
             # Create consolidated text file
             consolidated_path = temp_dir / "sessions.txt"
