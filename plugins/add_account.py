@@ -46,6 +46,7 @@ class AddAccountStates(StatesGroup):
     waiting_for_otp = State()
     waiting_for_2fa = State()
     waiting_for_string_or_file = State()
+    waiting_for_telethon_string_or_file = State()
 
 def get_back_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -62,6 +63,38 @@ def get_add_account_choice_keyboard() -> InlineKeyboardMarkup:
 
 
 # ----------------- TELETHON TO PYROGRAM CONVERTER -----------------
+def convert_telethon_string_to_pyrogram(telethon_string: str, fallback_api_id: int) -> str:
+    """Converts a Telethon Session String to a Pyrogram V2 Session String."""
+    import struct
+    import base64
+
+    fallback_api_id = int(fallback_api_id) if fallback_api_id else 6
+    telethon_string = telethon_string.strip()
+
+    if not telethon_string.startswith("1"):
+        raise ValueError("Not a valid Telethon string (does not start with '1')")
+
+    base64_str = telethon_string[1:]
+    # Add padding if necessary
+    padding_needed = len(base64_str) % 4
+    if padding_needed:
+        base64_str += "=" * (4 - padding_needed)
+
+    try:
+        decoded = base64.urlsafe_b64decode(base64_str)
+    except Exception as e:
+        raise ValueError(f"Failed to decode base64: {e}")
+
+    if len(decoded) != 263:
+        raise ValueError(f"Invalid Telethon string length (expected 263, got {len(decoded)})")
+
+    dc_id, ip_bytes, port, auth_key = struct.unpack(">B4sH256s", decoded)
+
+    # Repack into Pyrogram V2 using dummy user_id 9999
+    user_id = 9999
+    pyro_packed = struct.pack('>BI?256sQ?', dc_id, fallback_api_id, False, auth_key, user_id, False)
+    return base64.urlsafe_b64encode(pyro_packed).decode().rstrip("=")
+
 def parse_sqlite_to_pyrogram_string(db_path: str, fallback_api_id: int) -> str:
     """Safely extracts SQLite session data (Telethon or Pyrogram) and converts it into a Pyrogram String."""
     import sqlite3
@@ -125,6 +158,18 @@ async def start_add_account(message: Message, state: FSMContext):
         parse_mode="HTML",
         reply_markup=get_add_account_choice_keyboard()
     )
+
+@router.message(Command("telethon"))
+async def start_telethon_import(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer(
+        "📁 <b>ᴛᴇʟᴇᴛʜᴏɴ ɪᴍᴘᴏʀᴛ</b>\n\n"
+        "👉 <b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ʏᴏᴜʀ Telethon sᴇssɪᴏɴ sᴛʀɪɴɢ</b> (starts with <code>1</code>) as a text message or a <code>.txt</code> file.\n\n"
+        "👉 Alternatively, you can <b>upload a <code>.zip</code> archive</b> containing multiple text files with Telethon strings.",
+        parse_mode="HTML",
+        reply_markup=get_back_keyboard()
+    )
+    await state.set_state(AddAccountStates.waiting_for_telethon_string_or_file)
 
 @router.callback_query(F.data == "add_acc:phone")
 async def add_account_phone_callback(callback_query: CallbackQuery, state: FSMContext):
@@ -193,6 +238,257 @@ async def cancel_add_callback(callback_query: CallbackQuery, state: FSMContext):
             [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ᴍᴀɪɴ ᴍᴇɴᴜ", callback_data="menu:main")]
         ])
     )
+
+@router.message(AddAccountStates.waiting_for_telethon_string_or_file)
+async def process_telethon_string_or_file_upload(message: Message, state: FSMContext):
+    import os
+    import zipfile
+    import shutil
+    from pathlib import Path
+
+    session_str = None
+    file_path_to_clean = None
+
+    try:
+        if message.document:
+            file_id = message.document.file_id
+            file_name = message.document.file_name or ""
+
+            temp_dir = Path("temp_uploads")
+            temp_dir.mkdir(exist_ok=True)
+            dest_path = temp_dir / f"uploaded_tel_{message.from_user.id}_{file_name}"
+            file_path_to_clean = dest_path
+
+            bot_obj = message.bot
+            await bot_obj.download(file_id, destination=str(dest_path))
+
+            if file_name.lower().endswith(".zip"):
+                status_msg = await message.answer("⚙️ ᴇxᴛʀᴀᴄᴛɪɴɢ ᴀɴᴅ ᴘᴀʀsɪɴɢ <code>.zip</code> ᴀʀᴄʜɪᴠᴇ ꜰᴏʀ ᴛᴇʟᴇᴛʜᴏɴ...", parse_mode="HTML")
+                zip_extract_dir = temp_dir / f"extracted_tel_{message.from_user.id}_{os.urandom(4).hex()}"
+                try:
+                    zip_extract_dir.mkdir(exist_ok=True, parents=True)
+
+                    with zipfile.ZipFile(dest_path, 'r') as zip_ref:
+                        safe_members = []
+                        for member in zip_ref.infolist():
+                            filename = member.filename
+                            normalized = filename.replace("\\", "/")
+                            if normalized.startswith("/") or ".." in normalized.split("/"):
+                                logger.warning(f"Path traversal check failed for zip member: {filename}")
+                                continue
+                            safe_members.append(member)
+                        zip_ref.extractall(zip_extract_dir, members=safe_members)
+
+                    sessions_to_import = []
+                    all_found_files = []
+                    parsing_errors = []
+
+                    for root, dirs, files in os.walk(zip_extract_dir):
+                        for file in files:
+                            p = Path(root) / file
+                            file_size = p.stat().st_size if p.exists() else 0
+                            all_found_files.append((p.name, file_size))
+
+                            try:
+                                with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                                    content = f.read()
+                                # Find base64 strings starting with 1
+                                found_strings = re.findall(r"1[a-zA-Z0-9+\-_=/]{300,}", content)
+                                if found_strings:
+                                    for s in found_strings:
+                                        sessions_to_import.append(("string", s, p.name, None))
+                                else:
+                                    parsing_errors.append(f"{p.name} (no telethon session string found)")
+                            except Exception as txt_err:
+                                logger.error(f"Failed to read file {p.name} from ZIP: {txt_err}")
+                                parsing_errors.append(f"{p.name} (read err: {str(txt_err)[:40]})")
+
+                    if not sessions_to_import:
+                        files_list_str = ""
+                        for f_name, f_size in all_found_files[:15]:
+                            files_list_str += f"• <code>{html.escape(f_name)}</code> ({f_size} bytes)\n"
+                        if len(all_found_files) > 15:
+                            files_list_str += f"<i>...and {len(all_found_files) - 15} more files</i>\n"
+                        error_details = (
+                            "❌ <b>ɴᴏ ᴠᴀʟɪᴅ ᴛᴇʟᴇᴛʜᴏɴ sᴇssɪᴏɴs ꜰᴏᴜɴᴅ ɪɴ ᴛʜᴇ ᴢɪᴘ ᴀʀᴄʜɪᴠᴇ.</b>\n\n"
+                            f"📁 <b>Files found in ZIP ({len(all_found_files)}):</b>\n"
+                            f"{files_list_str or '• None'}"
+                        )
+                        await status_msg.edit_text(error_details, parse_mode="HTML", reply_markup=get_back_keyboard())
+                        return
+
+                    # We will continue the processing loop in the next step
+                    # Store variables needed for processing
+                    unique_sessions = []
+                    seen_strings = set()
+                    for s_type, s_data, s_name, s_workdir in sessions_to_import:
+                        if s_data not in seen_strings:
+                            seen_strings.add(s_data)
+                            unique_sessions.append((s_type, s_data, s_name, s_workdir))
+
+                    await process_telethon_bulk_import(message, state, unique_sessions, status_msg)
+                    return
+                except Exception as zip_err:
+                    logger.exception("Error processing ZIP file")
+                    await status_msg.edit_text(
+                        f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ᴘʀᴏᴄᴇss ᴢɪᴘ:</b> <code>{html.escape(str(zip_err))}</code>",
+                        parse_mode="HTML",
+                        reply_markup=get_back_keyboard()
+                    )
+                    return
+                finally:
+                    if zip_extract_dir.exists():
+                        try:
+                            shutil.rmtree(zip_extract_dir)
+                        except Exception as clean_err:
+                            pass
+            else:
+                try:
+                    with open(dest_path, "r", encoding="utf-8", errors="ignore") as f:
+                        content = f.read().strip()
+                    found_strings = re.findall(r"1[a-zA-Z0-9+\-_=/]{300,}", content)
+                    if found_strings:
+                        session_str = found_strings[0]
+                    else:
+                        session_str = content
+                except Exception as text_err:
+                    await message.answer(f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ʀᴇᴀᴅ ꜰɪʟᴇ:</b> <code>{html.escape(str(text_err))}</code>", parse_mode="HTML", reply_markup=get_back_keyboard())
+                    return
+        elif message.text:
+            content = message.text.strip()
+            found_strings = re.findall(r"1[a-zA-Z0-9+\-_=/]{300,}", content)
+            if found_strings:
+                session_str = found_strings[0]
+            else:
+                session_str = content
+        else:
+            await message.answer("⚠️ <b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ᴛᴇʟᴇᴛʜᴏɴ sᴇssɪᴏɴ sᴛʀɪɴɢ ᴏʀ ᴜᴘʟᴏᴀᴅ ᴀ ꜰɪʟᴇ.</b>", parse_mode="HTML", reply_markup=get_back_keyboard())
+            return
+
+        if not session_str or not session_str.startswith("1"):
+            await message.answer("⚠️ <b>ᴛʜᴇ sᴛʀɪɴɢ ᴅᴏᴇs ɴᴏᴛ ᴀᴘᴘᴇᴀʀ ᴛᴏ ʙᴇ ᴀ ᴠᴀʟɪᴅ ᴛᴇʟᴇᴛʜᴏɴ sᴇssɪᴏɴ (ᴍᴜsᴛ sᴛᴀʀᴛ ᴡɪᴛʜ '1').</b>", parse_mode="HTML", reply_markup=get_back_keyboard())
+            return
+
+        await process_telethon_bulk_import(message, state, [("string", session_str, "uploaded_string", None)], await message.answer("⏳ <b>ᴄᴏɴɴᴇᴄᴛɪɴɢ...</b>", parse_mode="HTML"))
+
+    finally:
+        if file_path_to_clean and os.path.exists(file_path_to_clean):
+            try:
+                os.remove(file_path_to_clean)
+            except:
+                pass
+
+
+async def process_telethon_bulk_import(message: Message, state: FSMContext, unique_sessions: list, status_msg: Message):
+    import time
+    success_count = 0
+    expired_sessions = []
+    other_failed_sessions = []
+
+    total_sessions = len(unique_sessions)
+    last_edit_time = time.time()
+
+    def make_progress_bar(current: int, total: int) -> str:
+        if total <= 0: return "░" * 10
+        filled = int(10 * current // total)
+        bar = "■" * filled + "□" * (10 - filled)
+        pct = int((current / total) * 100)
+        return f"<code>[{bar}]</code> <b>{pct}%</b>"
+
+    for i, (s_type, s_data, source_name, s_workdir) in enumerate(unique_sessions, 1):
+        now_time = time.time()
+        if i == 1 or i == total_sessions or (now_time - last_edit_time >= 1.5):
+            progress_text = (
+                f"⏳ <b>ᴛᴇʟᴇᴛʜᴏɴ ʙᴜʟᴋ ɪᴍᴘᴏʀᴛ ɪɴ ᴘʀᴏɢʀᴇss...</b>\n\n"
+                f"📈 <b>ᴘʀᴏɢʀᴇss:</b> {make_progress_bar(i - 1, total_sessions)} (<code>{i - 1} / {total_sessions}</code>)\n"
+                f"━━━━━━━━━━━━━━━━━━━━━\n"
+                f"✅ <b>sᴜᴄᴄᴇss:</b> <code>{success_count}</code>\n"
+                f"🔴 <b>ᴇxᴘɪʀᴇᴅ:</b> <code>{len(expired_sessions)}</code>\n"
+                f"⚠️ <b>ꜰᴀɪʟᴇᴅ:</b> <code>{len(other_failed_sessions)}</code>\n"
+                f"⏳ <b>ᴘᴇɴᴅɪɴɢ:</b> <code>{total_sessions - (i - 1)}</code>\n\n"
+                f"⚡ <i>Processing: {html.escape(source_name)}...</i>"
+            )
+            try:
+                await status_msg.edit_text(progress_text, parse_mode="HTML")
+                last_edit_time = now_time
+            except:
+                pass
+
+        proxy, proxy_error = get_random_proxy()
+        temp_name = f"uploaded_tel_sess_{message.from_user.id}_{i}"
+
+        try:
+            pyro_str = convert_telethon_string_to_pyrogram(s_data, API_ID)
+            client = create_pyrogram_client(session_name=temp_name, session_string=pyro_str, proxy=proxy)
+
+            await client.connect()
+            me = await client.get_me()
+            if not me:
+                raise ValueError("Could not retrieve account identity from get_me()")
+
+            phone = getattr(me, "phone_number", None)
+            if not phone:
+                phone = f"+{me.id}"
+            else:
+                if not phone.startswith("+"):
+                    phone = f"+{phone}"
+
+            first = me.first_name or ""
+            last = me.last_name or ""
+            name_parts = [first, last]
+            profile_name = " ".join([p for p in name_parts if p.strip()]) or me.username or "ᴜɴᴋɴᴏᴡɴ"
+
+            exported_session_str = await client.export_session_string()
+            encrypted_session = encrypt_data(exported_session_str)
+            await client.disconnect()
+
+            saved = await save_account(
+                phone=phone,
+                encrypted_session=encrypted_session,
+                user_id=message.from_user.id,
+                proxy=proxy,
+                profile_name=profile_name
+            )
+            if saved:
+                success_count += 1
+            else:
+                other_failed_sessions.append((source_name, "Failed to save to MongoDB"))
+
+        except AuthKeyInvalid:
+            expired_sessions.append((source_name, "Session Expired / Revoked"))
+            try: await client.disconnect()
+            except: pass
+        except Exception as err:
+            err_str = str(err)
+            if "deactivated" in err_str.lower() or "deactive" in err_str.lower():
+                expired_sessions.append((source_name, "Account Deactivated by Telegram"))
+            else:
+                other_failed_sessions.append((source_name, err_str))
+            try: await client.disconnect()
+            except: pass
+
+    summary_text = (
+        "📦 <b>ᴛᴇʟᴇᴛʜᴏɴ ʙᴜʟᴋ ɪᴍᴘᴏʀᴛ sUMMARY</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        f"✅ <b>sᴜᴄᴄᴇssꜰᴜʟʟʏ ɪᴍᴘᴏʀᴛᴇᴅ:</b> <code>{success_count} / {len(unique_sessions)}</code> accounts\n"
+    )
+    if expired_sessions:
+        summary_text += f"\n🔴 <b>ᴇxᴘɪʀᴇᴅ / ɪɴᴠᴀʟɪᴅ sᴇssɪᴏɴs:</b> <code>{len(expired_sessions)}</code>\n"
+    if other_failed_sessions:
+        summary_text += f"\n⚠️ <b>ᴏᴛʜᴇʀ ꜰᴀɪʟᴜʀᴇs:</b> <code>{len(other_failed_sessions)}</code>\n"
+    if not expired_sessions and not other_failed_sessions:
+        summary_text += "\n🟢 <b>All sessions imported successfully!</b>"
+
+    await status_msg.delete()
+    await message.answer(
+        summary_text,
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ᴍᴀɪɴ ᴍᴇɴᴜ", callback_data="menu:main")]
+        ])
+    )
+    await state.clear()
+
 
 @router.message(AddAccountStates.waiting_for_string_or_file)
 async def process_string_or_file_upload(message: Message, state: FSMContext):

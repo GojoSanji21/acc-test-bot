@@ -22,6 +22,7 @@ import logging
 from aiogram import Router, F, types
 from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from database.methods import delete_all_accounts
 logger = logging.getLogger("TGStorageBot.plugins.start")
 
 router = Router()
@@ -39,6 +40,9 @@ def get_main_keyboard() -> InlineKeyboardMarkup:
         ],
         [
             InlineKeyboardButton(text="ℹ️ ʜᴇʟᴘ & ɪɴꜰᴏ", callback_data="menu:help")
+        ],
+        [
+            InlineKeyboardButton(text="🗑️ ʀᴇᴍᴏᴠᴇ ᴀʟʟ sᴇssɪᴏɴs", callback_data="menu:remove_all_confirm")
         ]
     ]
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
@@ -99,6 +103,29 @@ async def send_help(message: Message):
         get_help_text(),
         parse_mode="HTML",
         disable_web_page_preview=True,
+        reply_markup=get_back_keyboard()
+    )
+
+@router.callback_query(F.data == "menu:remove_all_confirm")
+async def remove_all_confirm_callback(callback_query: CallbackQuery):
+    await callback_query.answer()
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Yes, Delete All", callback_data="menu:remove_all_yes")],
+        [InlineKeyboardButton(text="❌ Cancel", callback_data="menu:main")]
+    ])
+    await callback_query.message.edit_text(
+        "⚠️ <b>Are you sure you want to delete ALL saved sessions? This cannot be undone.</b>",
+        parse_mode="HTML",
+        reply_markup=keyboard
+    )
+
+@router.callback_query(F.data == "menu:remove_all_yes")
+async def remove_all_yes_callback(callback_query: CallbackQuery):
+    await callback_query.answer()
+    deleted_count = await delete_all_accounts(callback_query.from_user.id)
+    await callback_query.message.edit_text(
+        f"✅ <b>All sessions have been successfully removed.</b> (Deleted {deleted_count} accounts)",
+        parse_mode="HTML",
         reply_markup=get_back_keyboard()
     )
 
