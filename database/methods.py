@@ -68,6 +68,18 @@ async def delete_account(phone: str, user_id: int) -> bool:
         logger.error(f"Failed to delete account {phone} (user_id {user_id}): {e}")
         return False
 
+async def delete_all_accounts(user_id: int) -> int:
+    """
+    Deletes all accounts for a specific user_id.
+    Returns the number of deleted accounts.
+    """
+    try:
+        result = await accounts_collection.delete_many({"user_id": user_id})
+        return result.deleted_count
+    except Exception as e:
+        logger.error(f"Failed to delete all accounts for user_id {user_id}: {e}")
+        return 0
+
 async def get_all_accounts(user_id: int) -> list:
     """
     Retrieves all saved accounts for a specific user_id.
