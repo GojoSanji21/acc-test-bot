@@ -190,6 +190,7 @@ def pyrogram_to_telethon(session_str: str) -> str:
     if missing_padding:
         session_str += '=' * (4 - missing_padding)
 
+    import binascii
     try:
         decoded_bytes = base64.urlsafe_b64decode(session_str)
         # Unpack Pyrogram v2 string format: >BI?256sQ? (length = 271)
@@ -205,8 +206,8 @@ def pyrogram_to_telethon(session_str: str) -> str:
         # Pack into Telethon format: >B4sH256s (IPv4)
         telethon_packed = struct.pack('>B4sH256s', dc_id, ip_bytes, 443, auth_key)
 
-        return "1" + base64.urlsafe_b64encode(telethon_packed).decode().rstrip("=")
-    except Exception as e:
+        return "1" + base64.urlsafe_b64encode(telethon_packed).decode()
+    except (Exception, binascii.Error) as e:
         logger.debug(f"Failed to parse as Pyrogram session string: {e}")
         return None
 
@@ -225,13 +226,12 @@ def telethon_to_pyrogram(session_str: str) -> str:
     try:
         encoded_data = session_str[1:]
         # Pad base64 encoded data
-        missing_padding = len(encoded_data) % 4
-        if missing_padding:
-            encoded_data += '=' * (4 - missing_padding)
+        import binascii
+        encoded_data += "=" * (-len(encoded_data) % 4)
 
         try:
             decoded_bytes = base64.urlsafe_b64decode(encoded_data)
-        except Exception:
+        except (Exception, binascii.Error):
             decoded_bytes = base64.b64decode(encoded_data)
 
         # Telethon unpacked length:

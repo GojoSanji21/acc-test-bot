@@ -74,15 +74,14 @@ def convert_telethon_string_to_pyrogram(telethon_string: str, fallback_api_id: i
     if not telethon_string.startswith("1"):
         raise ValueError("Not a valid Telethon string (does not start with '1')")
 
+    import binascii
     base64_str = telethon_string[1:]
     # Add padding if necessary
-    padding_needed = len(base64_str) % 4
-    if padding_needed:
-        base64_str += "=" * (4 - padding_needed)
+    base64_str += "=" * (-len(base64_str) % 4)
 
     try:
         decoded = base64.urlsafe_b64decode(base64_str)
-    except Exception as e:
+    except (Exception, binascii.Error) as e:
         raise ValueError(f"Failed to decode base64: {e}")
 
     if len(decoded) != 263:
@@ -289,19 +288,22 @@ async def process_telethon_string_or_file_upload(message: Message, state: FSMCon
                             file_size = p.stat().st_size if p.exists() else 0
                             all_found_files.append((p.name, file_size))
 
-                            try:
-                                with open(p, "r", encoding="utf-8", errors="ignore") as f:
-                                    content = f.read()
-                                # Find base64 strings starting with 1
-                                found_strings = re.findall(r"1[a-zA-Z0-9+\-_=/]{300,}", content)
-                                if found_strings:
-                                    for s in found_strings:
-                                        sessions_to_import.append(("string", s, p.name, None))
-                                else:
-                                    parsing_errors.append(f"{p.name} (no telethon session string found)")
-                            except Exception as txt_err:
-                                logger.error(f"Failed to read file {p.name} from ZIP: {txt_err}")
-                                parsing_errors.append(f"{p.name} (read err: {str(txt_err)[:40]})")
+                            if p.suffix.lower() == ".session":
+                                sessions_to_import.append(("file", p.stem, p.name, str(p.parent)))
+                            else:
+                                try:
+                                    with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                                        content_f = f.read()
+                                    # Find base64 strings starting with 1
+                                    found_strings = re.findall(r"1[a-zA-Z0-9+\-_=/]{300,}", content_f)
+                                    if found_strings:
+                                        for s in found_strings:
+                                            sessions_to_import.append(("string", s, p.name, None))
+                                    else:
+                                        parsing_errors.append(f"{p.name} (no telethon session string found)")
+                                except Exception as txt_err:
+                                    logger.error(f"Failed to read file {p.name} from ZIP: {txt_err}")
+                                    parsing_errors.append(f"{p.name} (read err: {str(txt_err)[:40]})")
 
                     if not sessions_to_import:
                         files_list_str = ""
@@ -322,8 +324,9 @@ async def process_telethon_string_or_file_upload(message: Message, state: FSMCon
                     unique_sessions = []
                     seen_strings = set()
                     for s_type, s_data, s_name, s_workdir in sessions_to_import:
-                        if s_data not in seen_strings:
-                            seen_strings.add(s_data)
+                        dedup_key = f"{s_workdir}/{s_data}" if s_type == "file" else s_data
+                        if dedup_key not in seen_strings:
+                            seen_strings.add(dedup_key)
                             unique_sessions.append((s_type, s_data, s_name, s_workdir))
 
                     await process_telethon_bulk_import(message, state, unique_sessions, status_msg)
@@ -418,7 +421,12 @@ async def process_telethon_bulk_import(message: Message, state: FSMContext, uniq
         temp_name = f"uploaded_tel_sess_{message.from_user.id}_{i}"
 
         try:
-            pyro_str = convert_telethon_string_to_pyrogram(s_data, API_ID)
+            if s_type == "file":
+                session_file_path = os.path.join(s_workdir, f"{s_data}.session")
+                pyro_str = parse_sqlite_to_pyrogram_string(session_file_path, API_ID)
+            else:
+                pyro_str = convert_telethon_string_to_pyrogram(s_data, API_ID)
+
             client = create_pyrogram_client(session_name=temp_name, session_string=pyro_str, proxy=proxy)
 
             await client.connect()
