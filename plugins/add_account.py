@@ -20,7 +20,6 @@
 import re
 import logging
 import html
-from pyrogram.errors import RPCError, FloodWait, ChatAdminRequired, UserDeactivated, UsernameOccupied, UsernameInvalid, FreshResetAuthorisationForbidden
 from aiogram import Router, F, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -36,8 +35,7 @@ from pyrogram.errors import (
     PhoneCodeInvalid,
     PhoneCodeExpired,
     PasswordHashInvalid,
-    AuthKeyInvalid,
-    RPCError, FloodWait, ChatAdminRequired, UserDeactivated, UsernameOccupied, UsernameInvalid
+    AuthKeyInvalid
 )
 
 logger = logging.getLogger("TGStorageBot.plugins.add_account")
