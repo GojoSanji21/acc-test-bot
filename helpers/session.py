@@ -177,6 +177,54 @@ DC_IPS = {
     5: "91.108.56.165"
 }
 
+import sqlite3
+from pathlib import Path
+
+def generate_telethon_sqlite(session_str: str, phone_number: str, output_dir: Path | str) -> str:
+    """
+    Generates a Telethon .session SQLite file from a Pyrogram v2 Session string.
+    Returns the file path of the generated database.
+    """
+    import base64
+    import struct
+    import binascii
+
+    session_str = session_str.strip()
+    missing_padding = len(session_str) % 4
+    if missing_padding:
+        session_str += '=' * (4 - missing_padding)
+
+    try:
+        decoded_bytes = base64.urlsafe_b64decode(session_str)
+        if len(decoded_bytes) != 271:
+            return None
+
+        dc_id, api_id, test_mode, auth_key, user_id, is_bot = struct.unpack('>BI?256sQ?', decoded_bytes)
+        ip = DC_IPS.get(dc_id, "149.154.167.51")
+
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        out_path = output_dir / f"{phone_number}.session"
+
+        conn = sqlite3.connect(out_path)
+        cursor = conn.cursor()
+
+        cursor.execute("CREATE TABLE version (version integer primary key);")
+        cursor.execute("CREATE TABLE sessions (dc_id integer primary key, server_address text, port integer, auth_key blob, takeout_id integer);")
+        cursor.execute("CREATE TABLE entities (id integer primary key, hash integer not null, username text, phone integer, name text, date integer);")
+
+        cursor.execute("INSERT INTO version VALUES (7);")
+        cursor.execute("INSERT INTO sessions (dc_id, server_address, port, auth_key, takeout_id) VALUES (?, ?, 443, ?, 0);", (dc_id, ip, auth_key))
+
+        conn.commit()
+        conn.close()
+
+        return str(out_path)
+
+    except (Exception, binascii.Error) as e:
+        logger.debug(f"Failed to generate Telethon sqlite: {e}")
+        return None
+
 def pyrogram_to_telethon(session_str: str) -> str:
     """
     Converts a Pyrogram v2 Session string to a Telethon StringSession string.

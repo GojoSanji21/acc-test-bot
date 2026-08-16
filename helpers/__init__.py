@@ -24,5 +24,6 @@ from .session import (
     get_random_proxy,
     create_pyrogram_client,
     normalize_session_string,
-    pyrogram_to_telethon
+    pyrogram_to_telethon,
+    generate_telethon_sqlite
 )
