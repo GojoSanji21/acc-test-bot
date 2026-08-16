@@ -431,15 +431,16 @@ async def view_account_panel(callback_query: CallbackQuery, state: FSMContext):
             InlineKeyboardButton(text="🗑️ ᴅᴇʟᴇᴛᴇ", callback_data=f"acc_opt:delete:{phone}:{page}")
         ],
         [
-            InlineKeyboardButton(text="ᴘᴜʙʟɪᴄ ᴄʜᴀɴɴᴇʟs", callback_data=f"acc_opt:pub_chan:{phone}:{page}"),
-            InlineKeyboardButton(text="ᴘʀɪᴠᴀᴛᴇ ᴄʜᴀɴɴᴇʟs", callback_data=f"acc_opt:priv_chan:{phone}:{page}")
+            InlineKeyboardButton(text="ᴘᴜʙʟɪᴄ ᴄʜᴀɴɴᴇʟs", callback_data=f"chat_mgr:pub_chan:{phone}:{page}"),
+            InlineKeyboardButton(text="ᴘʀɪᴠᴀᴛᴇ ᴄʜᴀɴɴᴇʟs", callback_data=f"chat_mgr:priv_chan:{phone}:{page}")
         ],
         [
-            InlineKeyboardButton(text="ɢʀᴏᴜᴘs", callback_data=f"acc_opt:groups:{phone}:{page}"),
-            InlineKeyboardButton(text="ᴄʜᴀᴛ sᴛᴀᴛs", callback_data=f"acc_opt:chat_stats:{phone}:{page}")
+            InlineKeyboardButton(text="ɢʀᴏᴜᴘs", callback_data=f"chat_mgr:groups:{phone}:{page}"),
+            InlineKeyboardButton(text="ᴄʀᴇᴀᴛᴇ ᴄʜᴀɴɴᴇʟ", callback_data=f"chat_mgr:create_chan:{phone}:{page}")
         ],
         [
-            InlineKeyboardButton(text="ᴀᴄᴛɪᴠᴇ ᴅᴇᴠɪᴄᴇs", callback_data=f"acc_opt:devices:{phone}:{page}")
+            InlineKeyboardButton(text="ᴄʜᴀᴛ sᴛᴀᴛs", callback_data=f"chat_mgr:chat_stats:{phone}:{page}"),
+            InlineKeyboardButton(text="ᴀᴄᴛɪᴠᴇ ᴅᴇᴠɪᴄᴇs", callback_data=f"chat_mgr:devices:{phone}:{page}")
         ],
         [
             InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")
