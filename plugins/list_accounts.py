@@ -1440,22 +1440,21 @@ async def process_bulk_format_selection(callback_query: CallbackQuery):
             for acc in accounts:
                 phone = acc.get("phone")
                 session_str = decrypt_data(acc["encrypted_session"])
-
-                if format_choice == "telethon":
-                    out_str = pyrogram_to_telethon(session_str)
-                    if not out_str:
-                        out_str = "Error converting to Telethon format."
-                else:
-                    out_str = session_str
-
                 name_clean = phone.replace("+", "")
 
-                # Create individual text file
-                ind_txt_path = temp_dir / f"{name_clean}.txt"
-                with open(ind_txt_path, "w", encoding="utf-8") as ind_f:
-                    ind_f.write(out_str)
-
-                consolidated_lines.append(f"{phone}: {out_str}")
+                if format_choice == "telethon":
+                    generate_telethon_sqlite(session_str, name_clean, temp_dir)
+                    # For the consolidated string file, we can optionally keep the string format or skip it.
+                    # Since they want native sessions, let's just note it's converted.
+                    out_str = pyrogram_to_telethon(session_str) or "Error converting"
+                    consolidated_lines.append(f"{phone}: {out_str}")
+                else:
+                    out_str = session_str
+                    # Create individual text file
+                    ind_txt_path = temp_dir / f"{name_clean}.txt"
+                    with open(ind_txt_path, "w", encoding="utf-8") as ind_f:
+                        ind_f.write(out_str)
+                    consolidated_lines.append(f"{phone}: {out_str}")
 
             # Create consolidated text file
             consolidated_path = temp_dir / "sessions.txt"
@@ -1466,7 +1465,7 @@ async def process_bulk_format_selection(callback_query: CallbackQuery):
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
                 for root, _, files in os.walk(temp_dir):
                     for file in files:
-                        if file.endswith(".txt"):
+                        if file.endswith(".txt") or file.endswith(".session"):
                             zipf.write(os.path.join(root, file), file)
 
             if zip_path.exists() and zip_path.stat().st_size > 0:
