@@ -34,7 +34,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, CallbackQuery, FSInputFile
 
 from database import delete_account, get_all_accounts, get_account, save_account
-from helpers import decrypt_data, create_pyrogram_client, encrypt_data, pyrogram_to_telethon
+from helpers import decrypt_data, create_pyrogram_client, encrypt_data, pyrogram_to_telethon, generate_telethon_sqlite
 
 from pyrogram import raw
 from pyrogram.storage.file_storage import FileStorage
@@ -509,12 +509,10 @@ async def process_format_selection(callback_query: CallbackQuery):
 
         try:
             if format_choice == "telethon":
-                out_str = pyrogram_to_telethon(session_str)
-                if not out_str:
-                    raise ValueError("Failed to convert session string to Telethon format.")
-                file_path = temp_dir / f"{name_clean}.txt"
-                with open(file_path, "w", encoding="utf-8") as f:
-                    f.write(out_str)
+                out_path_str = generate_telethon_sqlite(session_str, name_clean, temp_dir)
+                if not out_path_str:
+                    raise ValueError("Failed to generate Telethon sqlite file.")
+                file_path = Path(out_path_str)
             else:
                 file_path = await save_session_string_to_file(session_str, name_clean, temp_dir)
 
@@ -1391,11 +1389,7 @@ async def process_bulk_format_selection(callback_query: CallbackQuery):
                 name_clean = phone.replace("+", "")
 
                 if format_choice == "telethon":
-                    out_str = pyrogram_to_telethon(session_str)
-                    if out_str:
-                        file_path = temp_dir / f"{name_clean}.txt"
-                        with open(file_path, "w", encoding="utf-8") as f:
-                            f.write(out_str)
+                    generate_telethon_sqlite(session_str, name_clean, temp_dir)
                 else:
                     await save_session_string_to_file(session_str, name_clean, temp_dir)
 
