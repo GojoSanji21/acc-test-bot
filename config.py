@@ -31,13 +31,13 @@ logging.basicConfig(
 logger = logging.getLogger("TGStorageBot")
 
 # Load environment variables
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8786489572:AAE9kcahP_0FBD8J5u6wO8fDNvmYJXS8o6w")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8368366261:AAGd-1uLPo8HWxhO05ZLenu2oIZquYeGLOM")
 API_ID = int(os.getenv("API_ID", "39800351"))
 API_HASH = os.getenv("API_HASH", "2a6fbe5d5c92adf1b49f9667be3598c3")
-MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://ArruBhai:NVPavPk34HtQ6RW1@cluster0.hhlnxa9.mongodb.net/?appName=Cluster0")
+MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://adilsh0137_db_user:E08VTbbalq1OQ44q@cluster0.s54nwax.mongodb.net/?appName=Naruto_new_season_bot")
 
 # Parse Owner ID
-OWNER_ID = int(os.getenv("OWNER_ID", "6360979950"))
+OWNER_ID = int(os.getenv("OWNER_ID", "1683225887"))
 
 # Custom Security Hybrid Algorithm
 class CustomSecurity:
