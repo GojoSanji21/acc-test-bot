@@ -1,3 +1,4 @@
+from pyrogram.errors import RPCError, FloodWait, ChatAdminRequired, UserDeactivated, UsernameOccupied, UsernameInvalid, FreshResetAuthorisationForbidden
 # =====================================================================================##
 #
 #  ██╗░░██╗███╗░░██╗██████╗░░█████╗░████████╗███████╗██████╗░

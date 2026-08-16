@@ -1,6 +1,7 @@
 import logging
 import html
 import emoji
+from pyrogram.errors import RPCError, FloodWait, ChatAdminRequired, UserDeactivated, UsernameOccupied, UsernameInvalid, FreshResetAuthorisationForbidden
 from aiogram import Router, F
 import uuid
 from aiogram.fsm.context import FSMContext
@@ -34,7 +35,7 @@ class CreateChannelState(StatesGroup):
 import math
 from database import get_account
 from helpers import decrypt_data, create_pyrogram_client
-from pyrogram.errors import RPCError, FloodWait, ChatAdminRequired, UsernameOccupied, UsernameInvalid, FreshResetAuthorisationForbidden
+
 from pyrogram.enums import ChatType
 
 @router.callback_query(F.data.startswith("chat_mgr:devices:"))
@@ -54,13 +55,15 @@ async def process_active_devices(callback_query: CallbackQuery):
 
     try:
         await client.connect()
-        authorizations = await client.get_authorizations()
+        from pyrogram.raw import functions as raw_functions
+        from pyrogram.raw import types as raw_types
+        authorizations = await client.invoke(raw_functions.account.GetAuthorizations())
 
         text = "📱 <b>ᴀᴄᴛɪᴠᴇ ᴅᴇᴠɪᴄᴇs</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
         keyboard = []
 
-        for auth in authorizations:
-            if auth.is_current:
+        for auth in authorizations.authorizations:
+            if getattr(auth, 'current', False):
                 text += f"🟢 <b>{html.escape(auth.device_model)}</b> (Current)\n"
             else:
                 text += f"🔴 <b>{html.escape(auth.device_model)}</b> (App: {html.escape(auth.app_version)})\n"
@@ -126,12 +129,17 @@ async def process_terminate_all_devices(callback_query: CallbackQuery):
 
     try:
         await client.connect()
-        authorizations = await client.get_authorizations()
+        from pyrogram.raw import functions as raw_functions
+        from pyrogram.raw import types as raw_types
+        authorizations = await client.invoke(raw_functions.account.GetAuthorizations())
         count = 0
-        for auth in authorizations:
-            if not auth.is_current:
-                await client.reset_authorization(auth.hash)
-                count += 1
+        for auth in authorizations.authorizations:
+            if not getattr(auth, 'current', False):
+                try:
+                    await client.invoke(raw_functions.account.ResetAuthorization(hash=auth.hash))
+                    count += 1
+                except Exception as e:
+                    logger.error(f"Failed to reset auth: {e}")
 
         await callback_query.answer(f"✅ {count} ᴅᴇᴠɪᴄᴇs ᴛᴇʀᴍɪɴᴀᴛᴇᴅ.", show_alert=True)
         # Re-trigger devices menu
@@ -230,11 +238,15 @@ async def process_dialog_fetching(callback_query: CallbackQuery):
         if client.is_connected:
             await client.disconnect()
 
+class SearchChatState(StatesGroup):
+    waiting_for_query = State()
+
 @router.callback_query(F.data.startswith("chat_mgr:chat_stats:"))
 async def process_chat_stats(callback_query: CallbackQuery):
-    await callback_query.answer("Calculating stats...")
+    await callback_query.answer("Loading Inbox...")
     parts = callback_query.data.split(":")
     phone = parts[2]
+    page = int(parts[3]) if len(parts) > 3 else 0
 
     acc = await get_account(phone, user_id=callback_query.from_user.id)
     if not acc:
@@ -245,22 +257,110 @@ async def process_chat_stats(callback_query: CallbackQuery):
 
     try:
         await client.connect()
-        pub_chan_count = 0
-        priv_chan_count = 0
-        group_count = 0
-
+        dialogs = []
         async for dialog in client.get_dialogs():
-            if dialog.chat.type == ChatType.CHANNEL:
-                if dialog.chat.username:
-                    pub_chan_count += 1
-                else:
-                    priv_chan_count += 1
-            elif dialog.chat.type in [ChatType.SUPERGROUP, ChatType.GROUP]:
-                group_count += 1
+            dialogs.append(dialog)
 
-        await callback_query.answer(f"📊 Chat Stats:\nPublic Channels: {pub_chan_count}\nPrivate Channels: {priv_chan_count}\nGroups: {group_count}", show_alert=True)
+        # 10 rows x 2 columns = 20 per page
+        per_page = 20
+        start_idx = page * per_page
+        end_idx = start_idx + per_page
+        page_dialogs = dialogs[start_idx:end_idx]
+
+        keyboard = []
+        row = []
+        for dialog in page_dialogs:
+            title = dialog.chat.title or dialog.chat.first_name or "Unknown"
+            if len(title) > 15: title = title[:15] + "..."
+            row.append(InlineKeyboardButton(text=f"🗨️ {title}", callback_data=f"chat_ctrl:{dialog.chat.id}:{phone}:{page}"))
+            if len(row) == 2:
+                keyboard.append(row)
+                row = []
+        if row:
+            keyboard.append(row)
+
+        nav_row = []
+        if page > 0:
+            nav_row.append(InlineKeyboardButton(text="◀️ ᴘʀᴇᴠɪᴏᴜs", callback_data=f"chat_mgr:chat_stats:{phone}:{page-1}"))
+        if end_idx < len(dialogs):
+            nav_row.append(InlineKeyboardButton(text="ɴᴇxᴛ ▶️", callback_data=f"chat_mgr:chat_stats:{phone}:{page+1}"))
+        if nav_row:
+            keyboard.append(nav_row)
+
+        keyboard.append([InlineKeyboardButton(text="🔍 sᴇᴀʀᴄʜ", callback_data=f"chat_mgr:search_stats:{phone}:{page}")])
+        keyboard.append([InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"view_acc:{phone}:{page}")])
+
+        await callback_query.message.edit_text(f"📊 <b>Inbox Browser & Stats</b>\n━━━━━━━━━━━━━━━━━━━━━\nTotal Chats: {len(dialogs)}", reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard), parse_mode="HTML")
     except Exception as e:
-        await callback_query.answer(f"❌ Error fetching stats: {e}", show_alert=True)
+        await callback_query.answer(f"❌ Error fetching inbox: {e}", show_alert=True)
+    finally:
+        if client.is_connected:
+            await client.disconnect()
+
+@router.callback_query(F.data.startswith("chat_mgr:search_stats:"))
+async def process_search_stats(callback_query: CallbackQuery, state: FSMContext):
+    await callback_query.answer()
+    parts = callback_query.data.split(":")
+    phone = parts[2]
+    page = parts[3]
+
+    await state.set_state(SearchChatState.waiting_for_query)
+    await state.update_data(phone=phone, page=page)
+
+    await callback_query.message.edit_text("🔍 Send search query (name, username, ID):\n\nSend /cancel to abort.", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ᴄᴀɴᴄᴇʟ", callback_data=f"chat_mgr:chat_stats:{phone}:{page}")]]))
+
+@router.message(SearchChatState.waiting_for_query)
+async def handle_search_chat_query(message: Message, state: FSMContext):
+    if message.text == "/cancel":
+        await state.clear()
+        await message.reply("❌ Cancelled.")
+        return
+
+    query = message.text.lower()
+    data = await state.get_data()
+    phone = data.get("phone")
+    page = data.get("page", 0)
+
+    acc = await get_account(phone, user_id=message.from_user.id)
+    if not acc:
+        await state.clear()
+        return
+
+    session_str = decrypt_data(acc["encrypted_session"])
+    client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
+
+    processing_msg = await message.reply("🔍 Searching...")
+    try:
+        await client.connect()
+        dialogs = []
+        async for dialog in client.get_dialogs():
+            title = (dialog.chat.title or "").lower()
+            fname = (dialog.chat.first_name or "").lower()
+            lname = (dialog.chat.last_name or "").lower()
+            uname = (dialog.chat.username or "").lower()
+            cid = str(dialog.chat.id)
+            if query in title or query in fname or query in lname or query in uname or query in cid:
+                dialogs.append(dialog)
+
+        keyboard = []
+        row = []
+        for dialog in dialogs[:20]: # Show up to 20 search results
+            title = dialog.chat.title or dialog.chat.first_name or "Unknown"
+            if len(title) > 15: title = title[:15] + "..."
+            row.append(InlineKeyboardButton(text=f"🗨️ {title}", callback_data=f"chat_ctrl:{dialog.chat.id}:{phone}:{page}"))
+            if len(row) == 2:
+                keyboard.append(row)
+                row = []
+        if row:
+            keyboard.append(row)
+
+        keyboard.append([InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"chat_mgr:chat_stats:{phone}:{page}")])
+
+        await processing_msg.edit_text(f"🔍 <b>Search Results for:</b> {html.escape(query)}\n━━━━━━━━━━━━━━━━━━━━━\nMatches: {len(dialogs)} (showing top 20)", reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard), parse_mode="HTML")
+        await state.clear()
+    except Exception as e:
+        await processing_msg.edit_text(f"❌ Error searching: {e}", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"chat_mgr:chat_stats:{phone}:{page}")]]))
+        await state.clear()
     finally:
         if client.is_connected:
             await client.disconnect()
@@ -294,11 +394,15 @@ async def process_chat_control_panel(callback_query: CallbackQuery, state: FSMCo
         keyboard = [
             [
                 InlineKeyboardButton(text="ᴄʜᴀɴɢᴇ ɴᴀᴍᴇ", callback_data=f"chat_act:rename:{chat.id}:{phone}:{page}"),
-                InlineKeyboardButton(text="ᴄʜᴀɴɢᴇ ᴘʜᴏᴛᴏ", callback_data=f"chat_act:photo:{chat.id}:{phone}:{page}")
+                InlineKeyboardButton(text="ᴄʜᴀɴɢᴇ ᴜsᴇʀɴᴀᴍᴇ", callback_data=f"chat_act:privacy:{chat.id}:{phone}:{page}")
             ],
             [
-                InlineKeyboardButton(text="ᴍᴀᴋᴇ ᴘᴜʙʟɪᴄ" if not chat.username else "ᴍᴀᴋᴇ ᴘʀɪᴠᴀᴛᴇ", callback_data=f"chat_act:privacy:{chat.id}:{phone}:{page}"),
+                InlineKeyboardButton(text="sᴇɴᴅ ᴍᴇssᴀɢᴇ", callback_data=f"chat_act:send_msg:{chat.id}:{phone}:{page}"),
                 InlineKeyboardButton(text="ᴘʀᴏᴍᴏᴛᴇ ᴀᴅᴍɪɴ", callback_data=f"chat_act:admin:{chat.id}:{phone}:{page}")
+            ],
+            [
+                InlineKeyboardButton(text="ᴘᴜʙʟɪᴄ ʟɪɴᴋ" if chat.username else "ᴘʀɪᴠᴀᴛᴇ ʟɪɴᴋ", url=f"https://t.me/{chat.username}" if chat.username else (chat.invite_link or f"https://t.me/c/{str(chat.id).replace('-100', '')}/1")),
+                InlineKeyboardButton(text="ᴅᴇʟᴇᴛᴇ ᴄʜᴀɴɴᴇʟ" if chat.type.name == "CHANNEL" else "ʟᴇᴀᴠᴇ ᴄʜᴀᴛ", callback_data=f"chat_act:delete:{chat.id}:{phone}:{page}")
             ],
             [InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"view_acc:{phone}:{page}")]
         ]
@@ -611,7 +715,7 @@ async def process_create_channel(callback_query: CallbackQuery, state: FSMContex
 
     await callback_query.message.edit_text(
         "📝 Send the name for the new channel:\n\nSend /cancel to abort.",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ᴄᴀɴᴄᴇʟ", callback_data=f"view_acc:{phone}:{page}")]])
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ᴄᴀɴᴄᴇʟ", callback_data=f"cancel_wizard:{phone}:{page}")]])
     )
 
 @router.message(CreateChannelState.enter_name)
@@ -630,7 +734,7 @@ async def handle_create_channel_name(message: Message, state: FSMContext):
 
     await message.reply(
         "📸 Send a profile photo for the new channel, or send /skip to continue without a photo:\n\nSend /cancel to abort.",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ᴄᴀɴᴄᴇʟ", callback_data=f"view_acc:{phone}:{page}")]])
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ᴄᴀɴᴄᴇʟ", callback_data=f"cancel_wizard:{phone}:{page}")]])
     )
 
 @router.message(CreateChannelState.enter_photo, F.photo)
@@ -657,7 +761,7 @@ async def handle_create_channel_photo(message: Message, state: FSMContext):
             InlineKeyboardButton(text="ᴘᴜʙʟɪᴄ", callback_data="chan_privacy:public"),
             InlineKeyboardButton(text="ᴘʀɪᴠᴀᴛᴇ", callback_data="chan_privacy:private")
         ],
-        [InlineKeyboardButton(text="ᴄᴀɴᴄᴇʟ", callback_data=f"view_acc:{phone}:{page}")]
+        [InlineKeyboardButton(text="ᴄᴀɴᴄᴇʟ", callback_data=f"cancel_wizard:{phone}:{page}")]
     ]
     await message.reply("🔒 Choose privacy for the new channel:", reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
 
@@ -680,7 +784,7 @@ async def handle_create_channel_photo_skip(message: Message, state: FSMContext):
                 InlineKeyboardButton(text="ᴘᴜʙʟɪᴄ", callback_data="chan_privacy:public"),
                 InlineKeyboardButton(text="ᴘʀɪᴠᴀᴛᴇ", callback_data="chan_privacy:private")
             ],
-            [InlineKeyboardButton(text="ᴄᴀɴᴄᴇʟ", callback_data=f"view_acc:{phone}:{page}")]
+            [InlineKeyboardButton(text="ᴄᴀɴᴄᴇʟ", callback_data=f"cancel_wizard:{phone}:{page}")]
         ]
         await message.reply("🔒 Choose privacy for the new channel:", reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
     else:
@@ -741,7 +845,7 @@ async def process_create_channel_privacy(callback_query: CallbackQuery, state: F
         await state.set_state(CreateChannelState.enter_username)
         await callback_query.message.edit_text(
             "🔗 Send the username (without @) for the public channel:\n\nSend /cancel to abort.",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ᴄᴀɴᴄᴇʟ", callback_data=f"view_acc:{phone}:{page}")]])
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ᴄᴀɴᴄᴇʟ", callback_data=f"cancel_wizard:{phone}:{page}")]])
         )
 
 @router.callback_query(F.data.startswith("retry_chan_username:"))
@@ -758,7 +862,7 @@ async def process_retry_channel_username(callback_query: CallbackQuery, state: F
 
     await callback_query.message.edit_text(
         "🔗 Send the username (without @) for the public channel:\n\nSend /cancel to abort.",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ᴄᴀɴᴄᴇʟ", callback_data=f"view_acc:{phone}:{page}")]])
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ᴄᴀɴᴄᴇʟ", callback_data=f"cancel_wizard:{phone}:{page}")]])
     )
 
 
@@ -804,7 +908,7 @@ async def handle_create_channel_username(message: Message, state: FSMContext):
                 f"⚠️ Channel created but {error_msg} Click below to retry.",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(text="ʀᴇᴛʀʏ ᴜsᴇʀɴᴀᴍᴇ", callback_data=f"retry_chan_username:{phone}:{page}:{created_chat_id}")],
-                    [InlineKeyboardButton(text="ᴄᴀɴᴄᴇʟ", callback_data=f"view_acc:{phone}:{page}")]
+                    [InlineKeyboardButton(text="ᴄᴀɴᴄᴇʟ", callback_data=f"cancel_wizard:{phone}:{page}")]
                 ])
             )
             return
@@ -829,3 +933,147 @@ async def handle_create_channel_username(message: Message, state: FSMContext):
                 pass
         if client.is_connected:
             await client.disconnect()
+
+class ChatSendState(StatesGroup):
+    waiting_for_message = State()
+
+@router.callback_query(F.data.startswith("chat_act:send_msg:"))
+async def process_chat_send_message(callback_query: CallbackQuery, state: FSMContext):
+    await callback_query.answer()
+    parts = callback_query.data.split(":")
+    chat_id = parts[2]
+    phone = parts[3]
+    page = parts[4]
+
+    await state.set_state(ChatSendState.waiting_for_message)
+    await state.update_data(chat_id=chat_id, phone=phone, page=page)
+
+    await callback_query.message.edit_text("✉️ Send the text, photo, document, or forward a message you want to send to this chat:\n\nSend /cancel to abort.", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ᴄᴀɴᴄᴇʟ", callback_data=f"chat_ctrl:{chat_id}:{phone}:{page}")]]))
+
+@router.message(ChatSendState.waiting_for_message)
+async def handle_chat_send_message(message: Message, state: FSMContext):
+    if message.text == "/cancel":
+        await state.clear()
+        await message.reply("❌ Cancelled.")
+        return
+
+    data = await state.get_data()
+    chat_id = data.get("chat_id")
+    phone = data.get("phone")
+    page = data.get("page")
+
+    acc = await get_account(phone, user_id=message.from_user.id)
+    if not acc:
+        await state.clear()
+        return
+
+    session_str = decrypt_data(acc["encrypted_session"])
+    client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
+
+    processing_msg = await message.reply("🔄 Sending message...")
+
+    try:
+        await client.connect()
+        # Very basic forwarding or sending (text only for now)
+        if message.text:
+            await client.send_message(int(chat_id), message.text)
+        elif message.photo:
+            file_id = message.photo[-1].file_id
+            file_info = await message.bot.get_file(file_id)
+            downloaded_file = await message.bot.download_file(file_info.file_path)
+            temp_path = f"temp_send_{message.from_user.id}.jpg"
+            with open(temp_path, 'wb') as f:
+                f.write(downloaded_file.read())
+            await client.send_photo(int(chat_id), photo=temp_path, has_spoiler=True)
+            import os
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+        elif message.document:
+             file_id = message.document.file_id
+             file_info = await message.bot.get_file(file_id)
+             downloaded_file = await message.bot.download_file(file_info.file_path)
+             temp_path = f"temp_send_{message.from_user.id}_{message.document.file_name}"
+             with open(temp_path, 'wb') as f:
+                 f.write(downloaded_file.read())
+             await client.send_document(int(chat_id), document=temp_path)
+             import os
+             if os.path.exists(temp_path):
+                 os.remove(temp_path)
+        else:
+             await processing_msg.edit_text("❌ Unsupported message type.", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"chat_ctrl:{chat_id}:{phone}:{page}")]]))
+             await state.clear()
+             return
+
+        await processing_msg.edit_text("✅ Message sent successfully.", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"chat_ctrl:{chat_id}:{phone}:{page}")]]))
+        await state.clear()
+    except Exception as e:
+        logger.error(f"Error sending message to {chat_id}: {e}")
+        await processing_msg.edit_text(f"❌ Error: {e}", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"chat_ctrl:{chat_id}:{phone}:{page}")]]))
+        await state.clear()
+    finally:
+        if client.is_connected:
+            await client.disconnect()
+
+@router.callback_query(F.data.startswith("chat_act:delete:"))
+async def process_chat_delete(callback_query: CallbackQuery, state: FSMContext):
+    await callback_query.answer()
+    parts = callback_query.data.split(":")
+    chat_id = parts[2]
+    phone = parts[3]
+    page = parts[4]
+
+    keyboard = [
+        [
+            InlineKeyboardButton(text="ʏᴇs, ᴅᴇʟᴇᴛᴇ/ʟᴇᴀᴠᴇ", callback_data=f"chat_act:confirm_del:{chat_id}:{phone}:{page}")
+        ],
+        [InlineKeyboardButton(text="ᴄᴀɴᴄᴇʟ", callback_data=f"chat_ctrl:{chat_id}:{phone}:{page}")]
+    ]
+    await callback_query.message.edit_text("⚠️ Are you sure you want to delete/leave this chat?", reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
+
+@router.callback_query(F.data.startswith("chat_act:confirm_del:"))
+async def process_chat_confirm_delete(callback_query: CallbackQuery):
+    await callback_query.answer()
+    parts = callback_query.data.split(":")
+    chat_id = parts[2]
+    phone = parts[3]
+    page = parts[4]
+
+    acc = await get_account(phone, user_id=callback_query.from_user.id)
+    if not acc:
+        return
+
+    session_str = decrypt_data(acc["encrypted_session"])
+    client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
+
+    try:
+        await client.connect()
+        chat = await client.get_chat(int(chat_id))
+        if chat.type.name == "CHANNEL" or chat.type.name == "SUPERGROUP":
+            try:
+                await client.delete_channel(int(chat_id))
+            except Exception:
+                await client.leave_chat(int(chat_id))
+        else:
+            await client.leave_chat(int(chat_id))
+
+        await callback_query.message.edit_text("✅ Chat deleted/left successfully.", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ᴀᴄᴄᴏᴜɴᴛ", callback_data=f"view_acc:{phone}:{page}")]]))
+    except Exception as e:
+        logger.error(f"Error deleting chat {chat_id}: {e}")
+        await callback_query.message.edit_text(f"❌ Error: {e}", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"chat_ctrl:{chat_id}:{phone}:{page}")]]))
+    finally:
+        if client.is_connected:
+            await client.disconnect()
+
+@router.callback_query(F.data.startswith("cancel_wizard:"))
+async def process_cancel_wizard(callback_query: CallbackQuery, state: FSMContext):
+    await callback_query.answer("Wizard Cancelled.")
+    await state.clear()
+
+    parts = callback_query.data.split(":")
+    phone = parts[1]
+    page = parts[2]
+
+    await callback_query.message.edit_text(
+        "❌ Action cancelled. Returning to menu.",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"view_acc:{phone}:{page}")]])
+    )

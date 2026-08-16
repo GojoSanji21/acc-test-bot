@@ -27,6 +27,7 @@ import re
 from pathlib import Path
 from datetime import datetime
 import datetime as dt
+from pyrogram.errors import RPCError, FloodWait, ChatAdminRequired, UserDeactivated, UsernameOccupied, UsernameInvalid, FreshResetAuthorisationForbidden
 from aiogram import Router, F, Bot, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -43,7 +44,8 @@ from pyrogram.storage.memory_storage import MemoryStorage
 # Pyrogram exceptions
 from pyrogram.errors import (
     AuthKeyInvalid,
-    RPCError
+    RPCError,
+    FloodWait, ChatAdminRequired, UserDeactivated, UsernameOccupied, UsernameInvalid, FreshResetAuthorisationForbidden
 )
 
 logger = logging.getLogger("TGStorageBot.plugins.list_accounts")
@@ -223,7 +225,7 @@ async def check_otp_logic(callback_query: CallbackQuery, phone: str, page: int):
     proxy = acc.get("proxy")
     custom_api = acc.get("custom_api")
 
-    client = create_pyrogram_client(f"otp_{phone.replace('+', '')}", session_str, proxy, custom_api)
+    client = create_pyrogram_client(session_name=f"otp_{phone.replace('+', '')}", session_string=session_str, proxy=proxy, custom_api=custom_api)
     try:
         await client.connect()
 
@@ -621,7 +623,7 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
         proxy = acc.get("proxy")
         custom_api = acc.get("custom_api")
 
-        client = create_pyrogram_client(f"det_{phone.replace('+', '')}", session_str, proxy, custom_api)
+        client = create_pyrogram_client(session_name=f"det_{phone.replace('+', '')}", session_string=session_str, proxy=proxy, custom_api=custom_api)
         try:
             await client.connect()
             me = await client.get_me()
@@ -718,7 +720,7 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
         proxy = acc.get("proxy")
         custom_api = acc.get("custom_api")
 
-        client = create_pyrogram_client(f"ver_{phone.replace('+', '')}", session_str, proxy, custom_api)
+        client = create_pyrogram_client(session_name=f"ver_{phone.replace('+', '')}", session_string=session_str, proxy=proxy, custom_api=custom_api)
         try:
             await client.connect()
             me = await client.get_me()
@@ -873,7 +875,7 @@ async def process_send_message(message: Message, state: FSMContext):
     custom_api = acc.get("custom_api")
 
     status_msg = await message.answer("⏳ <b><b>ᴄᴏɴɴᴇᴄᴛɪɴɢ ᴛᴏ ᴛᴇʟᴇɢʀᴀᴍ sᴇʀᴠᴇʀs &amp; sᴇɴᴅɪɴɢ...</b></b>", parse_mode="HTML")
-    client = create_pyrogram_client(f"snd_{phone.replace('+', '')}", session_str, proxy, custom_api)
+    client = create_pyrogram_client(session_name=f"snd_{phone.replace('+', '')}", session_string=session_str, proxy=proxy, custom_api=custom_api)
 
     try:
         await client.connect()
@@ -949,7 +951,7 @@ async def process_security_options(callback_query: CallbackQuery, state: FSMCont
         proxy = acc.get("proxy")
         custom_api = acc.get("custom_api")
 
-        client = create_pyrogram_client(f"sess_{phone.replace('+', '')}", session_str, proxy, custom_api)
+        client = create_pyrogram_client(session_name=f"sess_{phone.replace('+', '')}", session_string=session_str, proxy=proxy, custom_api=custom_api)
         try:
             await client.connect()
             authorizations_obj = await client.invoke(raw.functions.account.GetAuthorizations())
@@ -1064,7 +1066,7 @@ async def process_confirm_revoke_session(callback_query: CallbackQuery):
     proxy = acc.get("proxy")
     custom_api = acc.get("custom_api")
 
-    client = create_pyrogram_client(f"rev_{phone.replace('+', '')}", session_str, proxy, custom_api)
+    client = create_pyrogram_client(session_name=f"rev_{phone.replace('+', '')}", session_string=session_str, proxy=proxy, custom_api=custom_api)
     try:
         await client.connect()
         await client.invoke(raw.functions.account.ResetAuthorization(hash=sess_hash))
@@ -1114,7 +1116,7 @@ async def process_new_profile_name(message: Message, state: FSMContext):
     custom_api = acc.get("custom_api")
 
     status_msg = await message.answer("⏳ <b><b><b><b>ᴄᴏɴɴᴇᴄᴛɪɴɢ ᴛᴏ ᴛᴇʟᴇɢʀᴀᴍ sᴇʀᴠᴇʀs &amp; ᴜᴘᴅᴀᴛɪɴɢ...</b></b></b></b>", parse_mode="HTML")
-    client = create_pyrogram_client(f"ren_{phone.replace('+', '')}", session_str, proxy, custom_api)
+    client = create_pyrogram_client(session_name=f"ren_{phone.replace('+', '')}", session_string=session_str, proxy=proxy, custom_api=custom_api)
 
     try:
         await client.connect()
@@ -1176,7 +1178,7 @@ async def process_set_2fa_text(message: Message, state: FSMContext):
     custom_api = acc.get("custom_api")
 
     status_msg = await message.answer("⏳ <b><b>ᴄᴏɴɴᴇᴄᴛɪɴɢ ᴛᴏ ᴛᴇʟᴇɢʀᴀᴍ sᴇʀᴠᴇʀs...</b></b>", parse_mode="HTML")
-    client = create_pyrogram_client(f"sec_{phone.replace('+', '')}", session_str, proxy, custom_api)
+    client = create_pyrogram_client(session_name=f"sec_{phone.replace('+', '')}", session_string=session_str, proxy=proxy, custom_api=custom_api)
 
     try:
         await client.connect()
@@ -1252,7 +1254,7 @@ async def process_remove_2fa_text(message: Message, state: FSMContext):
     custom_api = acc.get("custom_api")
 
     status_msg = await message.answer("⏳ <b><b>ᴄᴏɴɴᴇᴄᴛɪɴɢ ᴛᴏ ᴛᴇʟᴇɢʀᴀᴍ sᴇʀᴠᴇʀs...</b></b>", parse_mode="HTML")
-    client = create_pyrogram_client(f"sec_{phone.replace('+', '')}", session_str, proxy, custom_api)
+    client = create_pyrogram_client(session_name=f"sec_{phone.replace('+', '')}", session_string=session_str, proxy=proxy, custom_api=custom_api)
 
     try:
         await client.connect()
