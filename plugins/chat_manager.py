@@ -1,11 +1,20 @@
 import logging
 import html
+import emoji
 from aiogram import Router, F
+import uuid
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, CallbackQuery
 
 logger = logging.getLogger("TGStorageBot.plugins.chat_manager")
+
+
+def to_small_caps(text: str) -> str:
+    normal = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    small_caps = "ᴀʙᴄᴅᴇғɢʜɪᴊᴋʟᴍɴᴏᴘǫʀsᴛᴜᴠᴡxʏᴢᴀʙᴄᴅᴇғɢʜɪᴊᴋʟᴍɴᴏᴘǫʀsᴛᴜᴠᴡxʏᴢ"
+    trans = str.maketrans(normal, small_caps)
+    return text.translate(trans)
 
 router = Router()
 
@@ -41,7 +50,7 @@ async def process_active_devices(callback_query: CallbackQuery):
         return
 
     session_str = decrypt_data(acc["encrypted_session"])
-    client = create_pyrogram_client(session_string=session_str)
+    client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
 
     try:
         await client.connect()
@@ -83,7 +92,7 @@ async def process_terminate_device(callback_query: CallbackQuery):
         return
 
     session_str = decrypt_data(acc["encrypted_session"])
-    client = create_pyrogram_client(session_string=session_str)
+    client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
 
     try:
         await client.connect()
@@ -113,7 +122,7 @@ async def process_terminate_all_devices(callback_query: CallbackQuery):
         return
 
     session_str = decrypt_data(acc["encrypted_session"])
-    client = create_pyrogram_client(session_string=session_str)
+    client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
 
     try:
         await client.connect()
@@ -150,7 +159,7 @@ async def process_dialog_fetching(callback_query: CallbackQuery):
         return
 
     session_str = decrypt_data(acc["encrypted_session"])
-    client = create_pyrogram_client(session_string=session_str)
+    client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
 
     try:
         await client.connect()
@@ -188,7 +197,23 @@ async def process_dialog_fetching(callback_query: CallbackQuery):
         keyboard = []
         for chat in current_chats:
             chat_title = chat.title or "Unknown"
-            keyboard.append([InlineKeyboardButton(text=f"{chat_title[:30]}", callback_data=f"chat_ctrl:{chat.id}:{phone}:{page}")])
+            display_title = to_small_caps(emoji.replace_emoji(chat_title, replace="").replace("[", "").replace("]", "").strip())
+
+            if chat.username:
+                url = f"https://t.me/{chat.username}"
+                keyboard.append([InlineKeyboardButton(text=f"{display_title[:30]}", url=url)])
+            else:
+                invite_link = chat.invite_link
+                if not invite_link:
+                    try:
+                        invite_link = await client.export_chat_invite_link(chat.id)
+                    except Exception:
+                        invite_link = None
+
+                if invite_link:
+                    keyboard.append([InlineKeyboardButton(text=f"{display_title[:30]}", url=invite_link)])
+                else:
+                    keyboard.append([InlineKeyboardButton(text=f"{display_title[:30]}", callback_data=f"chat_ctrl:{chat.id}:{phone}:{page}")])
 
         if len(filtered_chats) > items_per_page:
             # Add simple navigation logic later if needed
@@ -216,7 +241,7 @@ async def process_chat_stats(callback_query: CallbackQuery):
         return
 
     session_str = decrypt_data(acc["encrypted_session"])
-    client = create_pyrogram_client(session_string=session_str)
+    client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
 
     try:
         await client.connect()
@@ -253,7 +278,7 @@ async def process_chat_control_panel(callback_query: CallbackQuery, state: FSMCo
         return
 
     session_str = decrypt_data(acc["encrypted_session"])
-    client = create_pyrogram_client(session_string=session_str)
+    client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
 
     try:
         await client.connect()
@@ -320,7 +345,7 @@ async def handle_chat_rename(message: Message, state: FSMContext):
 
     new_title = message.text
     session_str = decrypt_data(acc["encrypted_session"])
-    client = create_pyrogram_client(session_string=session_str)
+    client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
 
     processing_msg = await message.reply("🔄 Processing...")
 
@@ -363,7 +388,7 @@ async def handle_chat_photo(message: Message, state: FSMContext):
         return
 
     session_str = decrypt_data(acc["encrypted_session"])
-    client = create_pyrogram_client(session_string=session_str)
+    client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
 
     processing_msg = await message.reply("🔄 Downloading photo and processing...")
     temp_path = f"temp_photo_{chat_id}.jpg"
@@ -414,7 +439,7 @@ async def process_chat_privacy(callback_query: CallbackQuery, state: FSMContext)
         return
 
     session_str = decrypt_data(acc["encrypted_session"])
-    client = create_pyrogram_client(session_string=session_str)
+    client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
 
     try:
         await client.connect()
@@ -474,7 +499,7 @@ async def handle_chat_make_public(message: Message, state: FSMContext):
 
     username = message.text.replace("@", "").strip()
     session_str = decrypt_data(acc["encrypted_session"])
-    client = create_pyrogram_client(session_string=session_str)
+    client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
 
     processing_msg = await message.reply("🔄 Processing...")
 
@@ -542,7 +567,7 @@ async def handle_chat_promote_admin(message: Message, state: FSMContext):
         pass
 
     session_str = decrypt_data(acc["encrypted_session"])
-    client = create_pyrogram_client(session_string=session_str)
+    client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
 
     processing_msg = await message.reply("🔄 Promoting user...")
 
@@ -679,7 +704,7 @@ async def process_create_channel_privacy(callback_query: CallbackQuery, state: F
             return
 
         session_str = decrypt_data(acc["encrypted_session"])
-        client = create_pyrogram_client(session_string=session_str)
+        client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
 
         processing_msg = await callback_query.message.edit_text("🔄 Creating private channel...")
 
@@ -693,7 +718,13 @@ async def process_create_channel_privacy(callback_query: CallbackQuery, state: F
                 except Exception as e:
                     logger.error(f"Error setting chat photo during creation: {e}")
 
-            await processing_msg.edit_text(f"✅ Private channel <b>{html.escape(channel_name)}</b> created successfully!", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"view_acc:{phone}:{page}")]]), parse_mode="HTML")
+            invite_link_str = ""
+            try:
+                inv_link = await client.export_chat_invite_link(new_chat.id)
+                invite_link_str = f"\n🔗 Link: {inv_link}"
+            except Exception:
+                pass
+            await processing_msg.edit_text(f"✅ Private channel <b>{html.escape(channel_name)}</b> created successfully!{invite_link_str}\n🆔 ID: <code>{new_chat.id}</code>", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"view_acc:{phone}:{page}")]]), parse_mode="HTML")
         except Exception as e:
             await processing_msg.edit_text(f"❌ Error creating channel: {e}", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"view_acc:{phone}:{page}")]]))
         finally:
@@ -753,7 +784,7 @@ async def handle_create_channel_username(message: Message, state: FSMContext):
         return
 
     session_str = decrypt_data(acc["encrypted_session"])
-    client = create_pyrogram_client(session_string=session_str)
+    client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
 
     processing_msg = await message.reply("🔄 Setting up public channel...")
 
@@ -784,7 +815,7 @@ async def handle_create_channel_username(message: Message, state: FSMContext):
             except Exception as e:
                 logger.error(f"Error setting chat photo during creation: {e}")
 
-        await processing_msg.edit_text(f"✅ Public channel <b>{html.escape(channel_name)}</b> created successfully with username <b>@{html.escape(username)}</b>!", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"view_acc:{phone}:{page}")]]), parse_mode="HTML")
+        await processing_msg.edit_text(f"✅ Public channel <b>{html.escape(channel_name)}</b> created successfully!\n🔗 Link: https://t.me/{username}\n🆔 ID: <code>{created_chat_id}</code>", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"view_acc:{phone}:{page}")]]), parse_mode="HTML")
         await state.clear()
     except Exception as e:
         await processing_msg.edit_text(f"❌ Error: {e}", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"view_acc:{phone}:{page}")]]))
