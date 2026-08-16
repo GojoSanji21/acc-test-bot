@@ -22,6 +22,7 @@ import re
 import html
 import asyncio
 import logging
+from pyrogram.errors import RPCError, FloodWait, ChatAdminRequired, UserDeactivated, UsernameOccupied, UsernameInvalid, FreshResetAuthorisationForbidden
 from aiogram import Router, F, Bot, types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, CallbackQuery
