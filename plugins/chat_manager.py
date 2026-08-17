@@ -275,7 +275,7 @@ async def process_chat_stats(callback_query: CallbackQuery):
         for dialog in page_dialogs:
             title = dialog.chat.title or dialog.chat.first_name or "Unknown"
             if len(title) > 15: title = title[:15] + "..."
-            row.append(InlineKeyboardButton(text=f"{title}", callback_data=f"chat_ctrl:{dialog.chat.id}:{phone}:{page}"))
+            row.append(InlineKeyboardButton(text=f"{to_small_caps(emoji.replace_emoji(title, replace='').replace('[', '').replace(']', '').strip())}", callback_data=f"chat_ctrl:{dialog.chat.id}:{phone}:{page}"))
             if len(row) == 2:
                 keyboard.append(row)
                 row = []
@@ -349,7 +349,7 @@ async def handle_search_chat_query(message: Message, state: FSMContext):
         for dialog in dialogs[:20]: # Show up to 20 search results
             title = dialog.chat.title or dialog.chat.first_name or "Unknown"
             if len(title) > 15: title = title[:15] + "..."
-            row.append(InlineKeyboardButton(text=f"{title}", callback_data=f"chat_ctrl:{dialog.chat.id}:{phone}:{page}"))
+            row.append(InlineKeyboardButton(text=f"{to_small_caps(emoji.replace_emoji(title, replace='').replace('[', '').replace(']', '').strip())}", callback_data=f"chat_ctrl:{dialog.chat.id}:{phone}:{page}"))
             if len(row) == 2:
                 keyboard.append(row)
                 row = []
@@ -386,20 +386,21 @@ async def process_chat_control_panel(callback_query: CallbackQuery, state: FSMCo
         is_admin = False
         try:
             chat = await client.get_chat(int(chat_id))
-            if chat.type in [ChatType.CHANNEL, ChatType.GROUP, ChatType.SUPERGROUP]:
-                member = await client.get_chat_member(int(chat_id), "me")
-                is_admin = member.status in [ChatMemberStatus.OWNER, ChatMemberStatus.ADMINISTRATOR]
-        except PeerIdInvalid:
-            async for _ in client.get_dialogs(limit=50):
-                pass
-            try:
-                chat = await client.get_chat(int(chat_id))
-                if chat.type in [ChatType.CHANNEL, ChatType.GROUP, ChatType.SUPERGROUP]:
-                    member = await client.get_chat_member(int(chat_id), "me")
-                    is_admin = member.status in [ChatMemberStatus.OWNER, ChatMemberStatus.ADMINISTRATOR]
-            except PeerIdInvalid:
+        except Exception:
+            async for dialog in client.get_dialogs(limit=100):
+                if dialog.chat.id == int(chat_id):
+                    chat = dialog.chat
+                    break
+            else:
                 await callback_query.answer("❌ Error: Peer ID Invalid. The bot might not have access to this chat.", show_alert=True)
                 return
+
+        if chat.type in [ChatType.CHANNEL, ChatType.GROUP, ChatType.SUPERGROUP]:
+            try:
+                member = await client.get_chat_member(int(chat_id), "me")
+                is_admin = member.status in [ChatMemberStatus.OWNER, ChatMemberStatus.ADMINISTRATOR]
+            except Exception:
+                pass
 
         text = f"⚙️ <b>Chat Control Panel</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
         text += f"🏷️ <b>Name:</b> {html.escape(chat.title or chat.first_name or 'Unknown')}\n"
