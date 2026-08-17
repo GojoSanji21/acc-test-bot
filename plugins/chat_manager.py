@@ -1,8 +1,10 @@
+import os
+import uuid
+import time
 import logging
 import html
 import emoji
 from aiogram import Router, F
-import uuid
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, CallbackQuery
@@ -23,6 +25,7 @@ class ChatManagerState(StatesGroup):
     change_photo = State()
     make_public = State()
     promote_admin = State()
+    send_message = State()
 
 class CreateChannelState(StatesGroup):
     enter_name = State()
@@ -53,7 +56,7 @@ async def process_active_devices(callback_query: CallbackQuery):
     client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
 
     try:
-        await client.connect()
+        await client.start()
         from pyrogram.raw import functions as raw_functions
         from pyrogram.raw import types as raw_types
         authorizations = await client.invoke(raw_functions.account.GetAuthorizations())
@@ -71,7 +74,7 @@ async def process_active_devices(callback_query: CallbackQuery):
                 text += f"🟢 <b>{html.escape(getattr(auth, 'app_name', 'Unknown'))} - {html.escape(getattr(auth, 'device_model', 'Unknown'))} ({html.escape(getattr(auth, 'platform', 'Unknown'))})</b>\n  IP: {ip_str} | Date: {date_str}\n"
             else:
                 text += f"🔴 <b>{html.escape(getattr(auth, 'app_name', 'Unknown'))} - {html.escape(getattr(auth, 'device_model', 'Unknown'))} ({html.escape(getattr(auth, 'platform', 'Unknown'))})</b>\n  IP: {ip_str} | Date: {date_str}\n"
-                keyboard.append([InlineKeyboardButton(text=f"ᴛᴇʀᴍɪɴᴀᴛᴇ {getattr(auth, 'device_model', 'Unknown')[:15]}", callback_data=f"term_dev:{auth.hash}:{phone}:{page}")])
+                keyboard.append([InlineKeyboardButton(text=f"ᴛᴇʀᴍɪɴᴀᴛᴇ {getattr(auth, 'device_model', 'Unknown'):15}", callback_data=f"term_dev:{auth.hash}:{phone}:{page}")])
 
         if len(authorizations.authorizations) > 1:
             keyboard.append([InlineKeyboardButton(text="ᴛᴇʀᴍɪɴᴀᴛᴇ ᴀʟʟ ᴏᴛʜᴇʀs", callback_data=f"term_all_dev:{phone}:{page}")])
@@ -83,8 +86,7 @@ async def process_active_devices(callback_query: CallbackQuery):
         logger.error(f"Error fetching devices for {phone}: {e}")
         await callback_query.message.edit_text(f"Error: {e}", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"view_acc:{phone}:{page}")]]))
     finally:
-        if client.is_connected:
-            await client.disconnect()
+        await client.stop()
 
 @router.callback_query(F.data.startswith("term_dev:"))
 async def process_terminate_device(callback_query: CallbackQuery):
@@ -102,7 +104,7 @@ async def process_terminate_device(callback_query: CallbackQuery):
     client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
 
     try:
-        await client.connect()
+        await client.start()
         from pyrogram.raw import functions as raw_functions
         await client.invoke(raw_functions.account.ResetAuthorization(hash=auth_hash))
         await callback_query.answer("ᴅᴇᴠɪᴄᴇ ᴛᴇʀᴍɪɴᴀᴛᴇᴅ.", show_alert=True)
@@ -115,8 +117,7 @@ async def process_terminate_device(callback_query: CallbackQuery):
         logger.error(f"Error terminating device: {e}")
         await callback_query.answer(f"Error: {e}", show_alert=True)
     finally:
-        if client.is_connected:
-            await client.disconnect()
+        await client.stop()
 
 @router.callback_query(F.data.startswith("term_all_dev:"))
 async def process_terminate_all_devices(callback_query: CallbackQuery):
@@ -133,7 +134,7 @@ async def process_terminate_all_devices(callback_query: CallbackQuery):
     client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
 
     try:
-        await client.connect()
+        await client.start()
         from pyrogram.raw import functions as raw_functions
         authorizations = await client.invoke(raw_functions.account.GetAuthorizations())
         count = 0
@@ -154,8 +155,7 @@ async def process_terminate_all_devices(callback_query: CallbackQuery):
     except Exception as e:
         await callback_query.answer(f"Error: {e}", show_alert=True)
     finally:
-        if client.is_connected:
-            await client.disconnect()
+        await client.stop()
 
 
 @router.callback_query(F.data.startswith("chat_mgr:pub_chan:") | F.data.startswith("chat_mgr:priv_chan:") | F.data.startswith("chat_mgr:groups:"))
@@ -174,7 +174,7 @@ async def process_dialog_fetching(callback_query: CallbackQuery):
     client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
 
     try:
-        await client.connect()
+        await client.start()
         dialogs = []
         async for dialog in client.get_dialogs():
             dialogs.append(dialog)
@@ -213,7 +213,7 @@ async def process_dialog_fetching(callback_query: CallbackQuery):
 
             if chat.username:
                 url = f"https://t.me/{chat.username}"
-                keyboard.append([InlineKeyboardButton(text=f"{display_title[:30]}", url=url)])
+                keyboard.append([InlineKeyboardButton(text=f"{display_title:30}", url=url)])
             else:
                 invite_link = chat.invite_link
                 if not invite_link:
@@ -223,9 +223,9 @@ async def process_dialog_fetching(callback_query: CallbackQuery):
                         invite_link = None
 
                 if invite_link:
-                    keyboard.append([InlineKeyboardButton(text=f"{display_title[:30]}", url=invite_link)])
+                    keyboard.append([InlineKeyboardButton(text=f"{display_title:30}", url=invite_link)])
                 else:
-                    keyboard.append([InlineKeyboardButton(text=f"{display_title[:30]}", callback_data=f"chat_ctrl:{chat.id}:{phone}:{page}")])
+                    keyboard.append([InlineKeyboardButton(text=f"{display_title:30}", callback_data=f"chat_ctrl:{chat.id}:{phone}:{page}")])
 
         if len(filtered_chats) > items_per_page:
             # Add simple navigation logic later if needed
@@ -239,8 +239,7 @@ async def process_dialog_fetching(callback_query: CallbackQuery):
         logger.error(f"Error fetching dialogs for {phone}: {e}")
         await callback_query.message.edit_text(f"❌ Error: {e}", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"view_acc:{phone}:{page}")]]))
     finally:
-        if client.is_connected:
-            await client.disconnect()
+        await client.stop()
 
 class SearchChatState(StatesGroup):
     waiting_for_query = State()
@@ -260,7 +259,7 @@ async def process_chat_stats(callback_query: CallbackQuery):
     client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
 
     try:
-        await client.connect()
+        await client.start()
         dialogs = []
         async for dialog in client.get_dialogs():
             dialogs.append(dialog)
@@ -298,8 +297,7 @@ async def process_chat_stats(callback_query: CallbackQuery):
     except Exception as e:
         await callback_query.answer(f"Error fetching inbox: {e}", show_alert=True)
     finally:
-        if client.is_connected:
-            await client.disconnect()
+        await client.stop()
 
 @router.callback_query(F.data.startswith("chat_mgr:search_stats:"))
 async def process_search_stats(callback_query: CallbackQuery, state: FSMContext):
@@ -335,7 +333,7 @@ async def handle_search_chat_query(message: Message, state: FSMContext):
 
     processing_msg = await message.reply("Searching...")
     try:
-        await client.connect()
+        await client.start()
         dialogs = []
         async for dialog in client.get_dialogs():
             title = (dialog.chat.title or "").lower()
@@ -366,8 +364,7 @@ async def handle_search_chat_query(message: Message, state: FSMContext):
         await processing_msg.edit_text(f"Error searching: {e}", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"chat_mgr:chat_stats:{phone}:{page}")]]))
         await state.clear()
     finally:
-        if client.is_connected:
-            await client.disconnect()
+        await client.stop()
 
 @router.callback_query(F.data.startswith("chat_ctrl:"))
 async def process_chat_control_panel(callback_query: CallbackQuery, state: FSMContext):
@@ -384,14 +381,25 @@ async def process_chat_control_panel(callback_query: CallbackQuery, state: FSMCo
     session_str = decrypt_data(acc["encrypted_session"])
     client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
 
-    from pyrogram.errors import PeerIdInvalid
     try:
-        await client.connect()
+        await client.start()
+        is_admin = False
         try:
             chat = await client.get_chat(int(chat_id))
+            if chat.type in [ChatType.CHANNEL, ChatType.GROUP, ChatType.SUPERGROUP]:
+                member = await client.get_chat_member(int(chat_id), "me")
+                is_admin = member.status in [ChatMemberStatus.OWNER, ChatMemberStatus.ADMINISTRATOR]
         except PeerIdInvalid:
-            await callback_query.answer("❌ Error: Peer ID Invalid. The bot might not have access to this chat.", show_alert=True)
-            return
+            async for _ in client.get_dialogs(limit=50):
+                pass
+            try:
+                chat = await client.get_chat(int(chat_id))
+                if chat.type in [ChatType.CHANNEL, ChatType.GROUP, ChatType.SUPERGROUP]:
+                    member = await client.get_chat_member(int(chat_id), "me")
+                    is_admin = member.status in [ChatMemberStatus.OWNER, ChatMemberStatus.ADMINISTRATOR]
+            except PeerIdInvalid:
+                await callback_query.answer("❌ Error: Peer ID Invalid. The bot might not have access to this chat.", show_alert=True)
+                return
 
         text = f"⚙️ <b>Chat Control Panel</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
         text += f"🏷️ <b>Name:</b> {html.escape(chat.title or chat.first_name or 'Unknown')}\n"
@@ -411,12 +419,6 @@ async def process_chat_control_panel(callback_query: CallbackQuery, state: FSMCo
                 keyboard.append([InlineKeyboardButton(text="ᴠɪᴇᴡ ᴄʜᴀᴛ", url=f"https://t.me/{chat.username}")])
             keyboard.append([InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"view_acc:{phone}:{page}")])
         elif chat.type in [ChatType.CHANNEL, ChatType.GROUP, ChatType.SUPERGROUP]:
-            from pyrogram.enums import ChatMemberStatus
-            try:
-                member = await client.get_chat_member(int(chat_id), "me")
-                is_admin = member.status in [ChatMemberStatus.OWNER, ChatMemberStatus.ADMINISTRATOR]
-            except Exception:
-                is_admin = False
 
             if not is_admin:
                 text += "\n⚠️ <i>You're not admin/owner of this chat.</i>"
@@ -447,8 +449,7 @@ async def process_chat_control_panel(callback_query: CallbackQuery, state: FSMCo
         logger.error(f"Error fetching chat control panel for {chat_id}: {e}")
         await callback_query.message.edit_text(f"❌ Error: {e}", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"view_acc:{phone}:{page}")]]))
     finally:
-        if client.is_connected:
-            await client.disconnect()
+        await client.stop()
 
 
 @router.callback_query(F.data.startswith("chat_act:rename:"))
@@ -488,7 +489,7 @@ async def handle_chat_rename(message: Message, state: FSMContext):
     processing_msg = await message.reply("🔄 Processing...")
 
     try:
-        await client.connect()
+        await client.start()
         await client.set_chat_title(int(chat_id), new_title)
         await processing_msg.edit_text(f"✅ Chat title successfully changed to: <b>{html.escape(new_title)}</b>", parse_mode="HTML")
     except ChatAdminRequired:
@@ -496,8 +497,7 @@ async def handle_chat_rename(message: Message, state: FSMContext):
     except Exception as e:
         await processing_msg.edit_text(f"❌ Error: {e}")
     finally:
-        if client.is_connected:
-            await client.disconnect()
+        await client.stop()
         await state.clear()
 
 @router.callback_query(F.data.startswith("chat_act:photo:"))
@@ -540,7 +540,7 @@ async def handle_chat_photo(message: Message, state: FSMContext):
         with open(temp_path, 'wb') as f:
             f.write(downloaded_file.read())
 
-        await client.connect()
+        await client.start()
         await client.set_chat_photo(int(chat_id), photo=temp_path)
         await processing_msg.edit_text("✅ Chat photo successfully updated.")
     except ChatAdminRequired:
@@ -548,9 +548,7 @@ async def handle_chat_photo(message: Message, state: FSMContext):
     except Exception as e:
         await processing_msg.edit_text(f"❌ Error: {e}")
     finally:
-        if client.is_connected:
-            await client.disconnect()
-        import os
+        await client.stop()
         if os.path.exists(temp_path):
             os.remove(temp_path)
         await state.clear()
@@ -580,7 +578,7 @@ async def process_chat_privacy(callback_query: CallbackQuery, state: FSMContext)
     client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
 
     try:
-        await client.connect()
+        await client.start()
         chat = await client.get_chat(int(chat_id))
 
         if chat.username:
@@ -598,8 +596,7 @@ async def process_chat_privacy(callback_query: CallbackQuery, state: FSMContext)
         logger.error(f"Error checking chat privacy for {chat_id}: {e}")
         await callback_query.message.edit_text(f"❌ Error: {e}", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"chat_ctrl:{chat_id}:{phone}:{page}")]]))
     finally:
-        if client.is_connected:
-            await client.disconnect()
+        await client.stop()
 
 @router.callback_query(F.data.startswith("retry_make_public:"))
 async def process_retry_make_public(callback_query: CallbackQuery, state: FSMContext):
@@ -642,7 +639,7 @@ async def handle_chat_make_public(message: Message, state: FSMContext):
     processing_msg = await message.reply("🔄 Processing...")
 
     try:
-        await client.connect()
+        await client.start()
         await client.set_chat_username(int(chat_id), username)
         await processing_msg.edit_text(f"✅ Chat is now public with username: <b>@{html.escape(username)}</b>", parse_mode="HTML")
         await state.clear()
@@ -662,8 +659,7 @@ async def handle_chat_make_public(message: Message, state: FSMContext):
         await processing_msg.edit_text(f"❌ Error: {e}")
         await state.clear()
     finally:
-        if client.is_connected:
-            await client.disconnect()
+        await client.stop()
 
 @router.callback_query(F.data.startswith("chat_act:admin:"))
 async def process_chat_promote_admin(callback_query: CallbackQuery, state: FSMContext):
@@ -710,7 +706,7 @@ async def handle_chat_promote_admin(message: Message, state: FSMContext):
     processing_msg = await message.reply("🔄 Promoting user...")
 
     try:
-        await client.connect()
+        await client.start()
 
         # Grant basic admin privileges
         privileges = ChatPrivileges(
@@ -733,8 +729,7 @@ async def handle_chat_promote_admin(message: Message, state: FSMContext):
     except Exception as e:
         await processing_msg.edit_text(f"❌ Error: {e}")
     finally:
-        if client.is_connected:
-            await client.disconnect()
+        await client.stop()
         await state.clear()
 
 @router.callback_query(F.data.startswith("chat_mgr:create_chan:"))
@@ -781,8 +776,6 @@ async def handle_create_channel_photo(message: Message, state: FSMContext):
     file_info = await message.bot.get_file(file_id)
     downloaded_file = await message.bot.download_file(file_info.file_path)
 
-    import os
-    import time
     temp_path = f"temp_channel_photo_{message.from_user.id}_{int(time.time())}.jpg"
     with open(temp_path, 'wb') as f:
         f.write(downloaded_file.read())
@@ -847,7 +840,7 @@ async def process_create_channel_privacy(callback_query: CallbackQuery, state: F
         processing_msg = await callback_query.message.edit_text("🔄 Creating private channel...")
 
         try:
-            await client.connect()
+            await client.start()
             new_chat = await client.create_channel(title=channel_name, description="")
 
             if channel_photo:
@@ -866,14 +859,12 @@ async def process_create_channel_privacy(callback_query: CallbackQuery, state: F
         except Exception as e:
             await processing_msg.edit_text(f"❌ Error creating channel: {e}", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"view_acc:{phone}:{page}")]]))
         finally:
-            import os
             if channel_photo and os.path.exists(channel_photo):
                 try:
                     os.remove(channel_photo)
                 except:
                     pass
-            if client.is_connected:
-                await client.disconnect()
+            await client.stop()
             await state.clear()
     else:
         await state.set_state(CreateChannelState.enter_username)
@@ -927,7 +918,7 @@ async def handle_create_channel_username(message: Message, state: FSMContext):
     processing_msg = await message.reply("🔄 Setting up public channel...")
 
     try:
-        await client.connect()
+        await client.start()
 
         if not created_chat_id:
             new_chat = await client.create_channel(title=channel_name, description="")
@@ -959,14 +950,12 @@ async def handle_create_channel_username(message: Message, state: FSMContext):
         await processing_msg.edit_text(f"❌ Error: {e}", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"view_acc:{phone}:{page}")]]))
         await state.clear()
     finally:
-        import os
         if channel_photo and os.path.exists(channel_photo):
             try:
                 os.remove(channel_photo)
             except:
                 pass
-        if client.is_connected:
-            await client.disconnect()
+        await client.stop()
 @router.callback_query(F.data.startswith("chat_act:block:"))
 async def process_chat_block(callback_query: CallbackQuery):
     await callback_query.answer()
@@ -983,12 +972,97 @@ async def process_chat_block(callback_query: CallbackQuery):
     client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
 
     try:
-        await client.connect()
+        await client.start()
         await client.block_user(int(chat_id))
         await callback_query.message.edit_text("✅ User/Bot blocked successfully.", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"view_acc:{phone}:{page}")]]))
     except Exception as e:
         logger.error(f"Error blocking user {chat_id}: {e}")
         await callback_query.message.edit_text(f"❌ Error: {e}", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"chat_ctrl:{chat_id}:{phone}:{page}")]]))
     finally:
-        if client.is_connected:
-            await client.disconnect()
+        await client.stop()
+
+@router.callback_query(F.data.startswith("chat_act:send_msg:"))
+async def process_chat_send_message(callback_query: CallbackQuery, state: FSMContext):
+    await callback_query.answer()
+    parts = callback_query.data.split(":")
+    chat_id = parts[2]
+    phone = parts[3]
+    page = parts[4]
+
+    await state.set_state(ChatManagerState.send_message)
+    await state.update_data(chat_id=chat_id, phone=phone, page=page)
+
+    await callback_query.message.edit_text("💬 Send the message you want to forward or send to this chat (Text, Photo, or Forwarded Message):\n\nSend /cancel to abort.", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ᴄᴀɴᴄᴇʟ", callback_data=f"chat_ctrl:{chat_id}:{phone}:{page}")]]))
+
+@router.message(ChatManagerState.send_message)
+async def handle_chat_send_message(message: Message, state: FSMContext):
+    if message.text == "/cancel":
+        data = await state.get_data()
+        chat_id = data.get("chat_id")
+        phone = data.get("phone")
+        page = data.get("page")
+        await state.clear()
+
+        await message.reply("❌ Cancelled.")
+        return
+
+    data = await state.get_data()
+    chat_id = data.get("chat_id")
+    phone = data.get("phone")
+    page = data.get("page")
+
+    acc = await get_account(phone, user_id=message.from_user.id)
+    if not acc:
+        await state.clear()
+        return
+
+    session_str = decrypt_data(acc["encrypted_session"])
+    client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
+
+    processing_msg = await message.reply("🔄 Sending message...")
+
+    temp_path = None
+    try:
+        await client.start()
+
+        if message.photo:
+            file_id = message.photo[-1].file_id
+            file_info = await message.bot.get_file(file_id)
+            downloaded_file = await message.bot.download_file(file_info.file_path)
+
+            temp_path = f"temp_send_photo_{uuid.uuid4().hex}.jpg"
+            with open(temp_path, 'wb') as f:
+                f.write(downloaded_file.read())
+
+            await client.send_photo(chat_id=int(chat_id), photo=temp_path, caption=message.caption or "")
+
+        elif message.text:
+            await client.send_message(chat_id=int(chat_id), text=message.text)
+        elif message.video:
+            file_id = message.video.file_id
+            file_info = await message.bot.get_file(file_id)
+            downloaded_file = await message.bot.download_file(file_info.file_path)
+
+            temp_path = f"temp_send_video_{uuid.uuid4().hex}.mp4"
+            with open(temp_path, 'wb') as f:
+                f.write(downloaded_file.read())
+
+            await client.send_video(chat_id=int(chat_id), video=temp_path, caption=message.caption or "")
+
+        else:
+            await processing_msg.edit_text("❌ Unsupported message type.")
+            return
+
+        await processing_msg.edit_text(f"✅ Message sent successfully.")
+    except ChatAdminRequired:
+        await processing_msg.edit_text("❌ You don't have permission to send messages here.")
+    except Exception as e:
+        await processing_msg.edit_text(f"❌ Error: {e}")
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass
+        await client.stop()
+        await state.clear()
