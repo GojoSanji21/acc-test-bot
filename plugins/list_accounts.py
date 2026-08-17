@@ -139,12 +139,12 @@ def estimate_account_age(user_id: int) -> tuple[str, str]:
 
 def get_back_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ᴍᴀɪɴ ᴍᴇɴᴜ", callback_data="menu:main")]
+        [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ᴍᴀɪɴ ᴍᴇɴᴜ", callback_data="menu:main")]
     ])
 
 def get_back_to_panel_keyboard(phone: str, page: int = 0) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ᴘᴀɴᴇʟ", callback_data=f"view_acc:{phone}:{page}")]
+        [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ᴘᴀɴᴇʟ", callback_data=f"view_acc:{phone}:{page}")]
     ])
 
 def get_accounts_keyboard(accounts: list, page: int = 0) -> InlineKeyboardMarkup:
@@ -163,17 +163,17 @@ def get_accounts_keyboard(accounts: list, page: int = 0) -> InlineKeyboardMarkup
     # Navigation row (only if total accounts > 6)
     nav_row = []
     if page > 0:
-        nav_row.append(InlineKeyboardButton(text="◀️ ᴘʀᴇᴠ", callback_data=f"list_page:{page - 1}"))
+        nav_row.append(InlineKeyboardButton(text="ᴘʀᴇᴠ", callback_data=f"list_page:{page - 1}"))
     if end_idx < len(accounts):
-        nav_row.append(InlineKeyboardButton(text="ɴᴇxᴛ ▶️", callback_data=f"list_page:{page + 1}"))
+        nav_row.append(InlineKeyboardButton(text="ɴᴇxᴛ", callback_data=f"list_page:{page + 1}"))
 
     if nav_row:
         keyboard.append(nav_row)
 
     # Add Bulk Export button inside accounts list, above back to main menu
-    keyboard.append([InlineKeyboardButton(text="📦 ʙᴜʟᴋ ᴇxᴘᴏʀᴛ / ɢᴇɴᴇʀᴀᴛᴇ", callback_data=f"bulk_export:menu:{page}")])
+    keyboard.append([InlineKeyboardButton(text="ʙᴜʟᴋ ᴇxᴘᴏʀᴛ / ɢᴇɴᴇʀᴀᴛᴇ", callback_data=f"bulk_export:menu:{page}")])
 
-    keyboard.append([InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ᴍᴀɪɴ ᴍᴇɴᴜ", callback_data="menu:main")])
+    keyboard.append([InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ᴍᴀɪɴ ᴍᴇɴᴜ", callback_data="menu:main")])
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 async def save_session_string_to_file(session_string: str, name: str, workdir: Path) -> Path:
@@ -258,7 +258,7 @@ async def check_otp_logic(callback_query: CallbackQuery, phone: str, page: int):
                     refresh_kbd = [
                         [
                             InlineKeyboardButton(text="🔄 ᴄʜᴇᴄᴋ ᴀɢᴀɪɴ / ʀᴇꜰʀᴇsʜ", callback_data=f"check_otp:{phone}:{page}"),
-                            InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ᴘᴀɴᴇʟ", callback_data=f"view_acc:{phone}:{page}")
+                            InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ᴘᴀɴᴇʟ", callback_data=f"view_acc:{phone}:{page}")
                         ]
                     ]
 
@@ -292,7 +292,7 @@ async def check_otp_logic(callback_query: CallbackQuery, phone: str, page: int):
             refresh_kbd = [
                 [
                     InlineKeyboardButton(text="🔄 ᴄʜᴇᴄᴋ ᴀɢᴀɪɴ / ʀᴇꜰʀᴇsʜ", callback_data=f"check_otp:{phone}:{page}"),
-                    InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ᴘᴀɴᴇʟ", callback_data=f"view_acc:{phone}:{page}")
+                    InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ᴘᴀɴᴇʟ", callback_data=f"view_acc:{phone}:{page}")
                 ]
             ]
 
@@ -413,22 +413,22 @@ async def view_account_panel(callback_query: CallbackQuery, state: FSMContext):
 
     panel_keyboard = [
         [
-            InlineKeyboardButton(text="📁 ᴅᴇᴛᴀɪʟs", callback_data=f"acc_opt:details:{phone}:{page}"),
-            InlineKeyboardButton(text="✔️ ᴠᴇʀɪꜰʏ", callback_data=f"acc_opt:verify:{phone}:{page}")
+            InlineKeyboardButton(text="ᴅᴇᴛᴀɪʟs", callback_data=f"acc_opt:details:{phone}:{page}"),
+            InlineKeyboardButton(text="ᴠᴇʀɪꜰʏ", callback_data=f"acc_opt:verify:{phone}:{page}")
         ],
         [
-            InlineKeyboardButton(text="✉️ sᴇɴᴅ", callback_data=f"acc_opt:send:{phone}:{page}"),
-            InlineKeyboardButton(text="📩 ᴏᴛᴘ ᴄᴏᴅᴇs", callback_data=f"acc_opt:otp:{phone}:{page}")
+            InlineKeyboardButton(text="sᴇɴᴅ", callback_data=f"acc_opt:send:{phone}:{page}"),
+            InlineKeyboardButton(text="ᴏᴛᴘ ᴄᴏᴅᴇs", callback_data=f"acc_opt:otp:{phone}:{page}")
         ],
         [
-            InlineKeyboardButton(text="🔑 ᴇxᴛʀᴀᴄᴛ", callback_data=f"acc_opt:extract:{phone}:{page}"),
-            InlineKeyboardButton(text="💾 ᴇxᴘᴏʀᴛ sǫʟɪᴛᴇ", callback_data=f"acc_opt:export:{phone}:{page}")
+            InlineKeyboardButton(text="ᴇxᴛʀᴀᴄᴛ", callback_data=f"acc_opt:extract:{phone}:{page}"),
+            InlineKeyboardButton(text="ᴇxᴘᴏʀᴛ sǫʟɪᴛᴇ", callback_data=f"acc_opt:export:{phone}:{page}")
         ],
         [
-            InlineKeyboardButton(text="🔐 sᴇᴄᴜʀɪᴛʏ", callback_data=f"acc_opt:security:{phone}:{page}")
+            InlineKeyboardButton(text="sᴇᴄᴜʀɪᴛʏ", callback_data=f"acc_opt:security:{phone}:{page}")
         ],
         [
-            InlineKeyboardButton(text="🗑️ ᴅᴇʟᴇᴛᴇ", callback_data=f"acc_opt:delete:{phone}:{page}")
+            InlineKeyboardButton(text="ᴅᴇʟᴇᴛᴇ", callback_data=f"acc_opt:delete:{phone}:{page}")
         ],
         [
             InlineKeyboardButton(text="ᴘᴜʙʟɪᴄ ᴄʜᴀɴɴᴇʟs", callback_data=f"chat_mgr:pub_chan:{phone}:{page}"),
@@ -443,7 +443,7 @@ async def view_account_panel(callback_query: CallbackQuery, state: FSMContext):
             InlineKeyboardButton(text="ᴀᴄᴛɪᴠᴇ ᴅᴇᴠɪᴄᴇs", callback_data=f"chat_mgr:devices:{phone}:{page}")
         ],
         [
-            InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")
+            InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")
         ]
     ]
 
@@ -580,8 +580,8 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
     if action == "delete":
         confirm_kbd = [
             [
-                InlineKeyboardButton(text="✅ ʏᴇs, ᴅᴇʟᴇᴛᴇ", callback_data=f"confirm_del:{phone}:{page}"),
-                InlineKeyboardButton(text="❌ ɴᴏ, ᴄᴀɴᴄᴇʟ", callback_data=f"view_acc:{phone}:{page}")
+                InlineKeyboardButton(text="ʏᴇs, ᴅᴇʟᴇᴛᴇ", callback_data=f"confirm_del:{phone}:{page}"),
+                InlineKeyboardButton(text="ɴᴏ, ᴄᴀɴᴄᴇʟ", callback_data=f"view_acc:{phone}:{page}")
             ]
         ]
         await callback_query.message.edit_text(
@@ -767,9 +767,9 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
     # Handle Extract option
     if action == "extract":
         format_kbd = [
-            [InlineKeyboardButton(text="[ ᴘʏʀᴏɢʀᴀᴍ ]", callback_data=f"format_sel:pyrogram:extract:{phone}:{page}")],
-            [InlineKeyboardButton(text="[ ᴛᴇʟᴇᴛʜᴏɴ ]", callback_data=f"format_sel:telethon:extract:{phone}:{page}")],
-            [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ", callback_data=f"view_acc:{phone}:{page}")]
+            [InlineKeyboardButton(text="ᴘʏʀᴏɢʀᴀᴍ", callback_data=f"format_sel:pyrogram:extract:{phone}:{page}")],
+            [InlineKeyboardButton(text="ᴛᴇʟᴇᴛʜᴏɴ", callback_data=f"format_sel:telethon:extract:{phone}:{page}")],
+            [InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"view_acc:{phone}:{page}")]
         ]
         await callback_query.message.edit_text(
             "🗂 <b>Choose the session format for export:</b>",
@@ -781,9 +781,9 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
     # Handle Export SQLite option
     if action == "export":
         format_kbd = [
-            [InlineKeyboardButton(text="[ ᴘʏʀᴏɢʀᴀᴍ ]", callback_data=f"format_sel:pyrogram:export:{phone}:{page}")],
-            [InlineKeyboardButton(text="[ ᴛᴇʟᴇᴛʜᴏɴ ]", callback_data=f"format_sel:telethon:export:{phone}:{page}")],
-            [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ", callback_data=f"view_acc:{phone}:{page}")]
+            [InlineKeyboardButton(text="ᴘʏʀᴏɢʀᴀᴍ", callback_data=f"format_sel:pyrogram:export:{phone}:{page}")],
+            [InlineKeyboardButton(text="ᴛᴇʟᴇᴛʜᴏɴ", callback_data=f"format_sel:telethon:export:{phone}:{page}")],
+            [InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"view_acc:{phone}:{page}")]
         ]
         await callback_query.message.edit_text(
             "🗂 <b>Choose the session format for export:</b>",
@@ -799,14 +799,14 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
         sec_kbd = [
             [
                 InlineKeyboardButton(text="🆕 sᴇᴛ / ᴄʜᴀɴɢᴇ 2ꜰᴀ", callback_data=f"sec_opt:set_2fa:{phone}:{page}"),
-                InlineKeyboardButton(text="❌ ʀᴇᴍᴏᴠᴇ 2ꜰᴀ", callback_data=f"sec_opt:remove_2fa:{phone}:{page}")
+                InlineKeyboardButton(text="ʀᴇᴍᴏᴠᴇ 2ꜰᴀ", callback_data=f"sec_opt:remove_2fa:{phone}:{page}")
             ],
             [
                 InlineKeyboardButton(text="💻 ᴠɪᴇᴡ sᴇssɪᴏɴs", callback_data=f"sec_opt:view_sessions:{phone}:{page}"),
                 InlineKeyboardButton(text="✏️ ʀᴇɴᴀᴍᴇ ᴘʀᴏꜰɪʟᴇ", callback_data=f"sec_opt:rename_profile:{phone}:{page}")
             ],
             [
-                InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ᴘᴀɴᴇʟ", callback_data=f"view_acc:{phone}:{page}")
+                InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ᴘᴀɴᴇʟ", callback_data=f"view_acc:{phone}:{page}")
             ]
         ]
 
@@ -989,7 +989,7 @@ async def process_security_options(callback_query: CallbackQuery, state: FSMCont
                         )
                     ])
 
-            sess_buttons.append([InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ sᴇᴄᴜʀɪᴛʏ", callback_data=f"acc_opt:security:{phone}:{page}")])
+            sess_buttons.append([InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ sᴇᴄᴜʀɪᴛʏ", callback_data=f"acc_opt:security:{phone}:{page}")])
 
             await callback_query.message.edit_text(
                 sessions_text,
@@ -1033,8 +1033,8 @@ async def process_revoke_session_prompt(callback_query: CallbackQuery):
 
     confirm_kbd = [
         [
-            InlineKeyboardButton(text="✅ ʏᴇs, ʀᴇᴠᴏᴋᴇ", callback_data=f"confirm_rev:{phone}:{sess_hash}:{page}"),
-            InlineKeyboardButton(text="❌ ɴᴏ, ᴄᴀɴᴄᴇʟ", callback_data=f"sec_opt:view_sessions:{phone}:{page}")
+            InlineKeyboardButton(text="ʏᴇs, ʀᴇᴠᴏᴋᴇ", callback_data=f"confirm_rev:{phone}:{sess_hash}:{page}"),
+            InlineKeyboardButton(text="ɴᴏ, ᴄᴀɴᴄᴇʟ", callback_data=f"sec_opt:view_sessions:{phone}:{page}")
         ]
     ]
 
@@ -1072,7 +1072,7 @@ async def process_confirm_revoke_session(callback_query: CallbackQuery):
         await callback_query.message.edit_text(
             f"✅ <b>sᴇssɪᴏɴ ʀᴇᴠᴏᴋᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b>",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ sᴇssɪᴏɴs ʟɪsᴛ", callback_data=f"sec_opt:view_sessions:{phone}:{page}")]
+                [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ sᴇssɪᴏɴs ʟɪsᴛ", callback_data=f"sec_opt:view_sessions:{phone}:{page}")]
             ]),
             parse_mode="HTML"
         )
@@ -1080,7 +1080,7 @@ async def process_confirm_revoke_session(callback_query: CallbackQuery):
         await callback_query.message.edit_text(
             f"❌ <b><b>ꜰᴀɪʟᴇᴅ ᴛᴏ ʀᴇᴠᴏᴋᴇ sᴇssɪᴏɴ:</b></b> <code>{html.escape(str(e))}</code>",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ sᴇssɪᴏɴs ʟɪsᴛ", callback_data=f"sec_opt:view_sessions:{phone}:{page}")]
+                [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ sᴇssɪᴏɴs ʟɪsᴛ", callback_data=f"sec_opt:view_sessions:{phone}:{page}")]
             ]),
             parse_mode="HTML"
         )
@@ -1287,9 +1287,9 @@ async def bulk_export_prompt_handler(callback_query: CallbackQuery):
     page = int(parts[2]) if len(parts) > 2 else 0
 
     format_kbd = [
-        [InlineKeyboardButton(text="[ ᴘʏʀᴏɢʀᴀᴍ ]", callback_data=f"format_sel_bulk:pyrogram:{action}:{page}")],
-        [InlineKeyboardButton(text="[ ᴛᴇʟᴇᴛʜᴏɴ ]", callback_data=f"format_sel_bulk:telethon:{action}:{page}")],
-        [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ", callback_data=f"bulk_export:menu:{page}")]
+        [InlineKeyboardButton(text="ᴘʏʀᴏɢʀᴀᴍ", callback_data=f"format_sel_bulk:pyrogram:{action}:{page}")],
+        [InlineKeyboardButton(text="ᴛᴇʟᴇᴛʜᴏɴ", callback_data=f"format_sel_bulk:telethon:{action}:{page}")],
+        [InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"bulk_export:menu:{page}")]
     ]
     await callback_query.message.edit_text(
         "🗂 <b>Choose the session format for export:</b>",
@@ -1313,7 +1313,7 @@ async def process_bulk_format_selection(callback_query: CallbackQuery):
         await callback_query.message.edit_text(
             "📭 <b>ɴᴏ sᴀᴠᴇᴅ ᴛᴇʟᴇɢʀᴀᴍ ᴀᴄᴄᴏᴜɴᴛs ꜰᴏᴜɴᴅ ᴛᴏ ᴇxᴘᴏʀᴛ.</b>",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
+                [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
             ]),
             parse_mode="HTML"
         )
@@ -1355,7 +1355,7 @@ async def process_bulk_format_selection(callback_query: CallbackQuery):
                 await callback_query.message.edit_text(
                     f"✅ <b>session strings text file sent successfully!</b>\n\n📱 <b>ᴛᴏᴛᴀʟ ᴀᴄᴄᴏᴜɴᴛs:</b> <code>{len(accounts)}</code>",
                     reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                        [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
+                        [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
                     ]),
                     parse_mode="HTML"
                 )
@@ -1367,7 +1367,7 @@ async def process_bulk_format_selection(callback_query: CallbackQuery):
             await callback_query.message.edit_text(
                 f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ɢᴇɴᴇʀᴀᴛᴇ ᴛᴇxᴛ ꜰɪʟᴇ:</b> <code>{html.escape(str(txt_err))}</code>",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
+                    [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
                 ]),
                 parse_mode="HTML"
             )
@@ -1422,7 +1422,7 @@ async def process_bulk_format_selection(callback_query: CallbackQuery):
                 await callback_query.message.edit_text(
                     f"✅ <b> sᴇssɪᴏɴs ZIP file sent successfully!</b>\n\n📱 <b>ᴛᴏᴛᴀʟ ᴀᴄᴄᴏᴜɴᴛs:</b> <code>{len(accounts)}</code>",
                     reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                        [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
+                        [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
                     ]),
                     parse_mode="HTML"
                 )
@@ -1434,7 +1434,7 @@ async def process_bulk_format_selection(callback_query: CallbackQuery):
             await callback_query.message.edit_text(
                 f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ɢᴇɴᴇʀᴀᴛᴇ sǫʟɪᴛᴇ ᴢɪᴘ:</b> <code>{html.escape(str(zip_err))}</code>",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
+                    [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
                 ]),
                 parse_mode="HTML"
             )
@@ -1490,7 +1490,7 @@ async def process_bulk_format_selection(callback_query: CallbackQuery):
                 await callback_query.message.edit_text(
                     f"✅ <b>sᴇssɪᴏɴ sᴛʀɪɴɢs ZIP file sent successfully!</b>\n\n📱 <b>ᴛᴏᴛᴀʟ ᴀᴄᴄᴏᴜɴᴛs:</b> <code>{len(accounts)}</code>",
                     reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                        [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
+                        [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
                     ]),
                     parse_mode="HTML"
                 )
@@ -1502,7 +1502,7 @@ async def process_bulk_format_selection(callback_query: CallbackQuery):
             await callback_query.message.edit_text(
                 f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ɢᴇɴᴇʀᴀᴛᴇ sᴛʀɪɴɢs ᴢɪᴘ:</b> <code>{html.escape(str(zip_err))}</code>",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
+                    [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
                 ]),
                 parse_mode="HTML"
             )
@@ -1534,7 +1534,7 @@ async def bulk_export_handler(callback_query: CallbackQuery):
         await callback_query.message.edit_text(
             "📭 <b>ɴᴏ sᴀᴠᴇᴅ ᴛᴇʟᴇɢʀᴀᴍ ᴀᴄᴄᴏᴜɴᴛs ꜰᴏᴜɴᴅ ᴛᴏ ᴇxᴘᴏʀᴛ.</b>",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
+                [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
             ]),
             parse_mode="HTML"
         )
@@ -1543,9 +1543,9 @@ async def bulk_export_handler(callback_query: CallbackQuery):
     if action == "menu":
         export_keyboard = [
             [InlineKeyboardButton(text="📥 ᴇxᴘᴏʀᴛ ᴄᴜʀʀᴇɴᴛ sᴇssɪᴏɴs (.ᴢɪᴘ)", callback_data=f"bulk_export_prompt:sqlite:{page}")],
-            [InlineKeyboardButton(text="🌀 ɢᴇɴᴇʀᴀᴛᴇ ᴀʟʟ ɴᴇᴡ sᴇssɪᴏɴs (.ᴢɪᴘ)", callback_data=f"bulk_export_prompt:strings:{page}")],
-            [InlineKeyboardButton(text="📄 ᴇxᴘᴏʀᴛ sɪɴɢʟᴇ ᴛᴇxᴛ ꜰɪʟᴇ (.ᴛxᴛ)", callback_data=f"bulk_export_prompt:text_file:{page}")],
-            [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ", callback_data=f"back_to_list:{page}")]
+            [InlineKeyboardButton(text="ɢᴇɴᴇʀᴀᴛᴇ ᴀʟʟ ɴᴇᴡ sᴇssɪᴏɴs (.ᴢɪᴘ)", callback_data=f"bulk_export_prompt:strings:{page}")],
+            [InlineKeyboardButton(text="ᴇxᴘᴏʀᴛ sɪɴɢʟᴇ ᴛᴇxᴛ ꜰɪʟᴇ (.ᴛxᴛ)", callback_data=f"bulk_export_prompt:text_file:{page}")],
+            [InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"back_to_list:{page}")]
         ]
         await callback_query.message.edit_text(
             "📦 <b>ʙᴜʟᴋ ᴇxᴘᴏʀᴛ / ɢᴇɴᴇʀᴀᴛᴇ</b>\n\n"
@@ -1572,7 +1572,7 @@ async def process_confirm_deletion(callback_query: CallbackQuery):
             f"✅ <b>sᴜᴄᴄᴇssꜰᴜʟʟʏ ᴅᴇʟᴇᴛᴇᴅ ᴀᴄᴄᴏᴜɴᴛ:</b> <code>{html.escape(phone)}</code>",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
+                [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
             ])
         )
     else:
@@ -1580,6 +1580,6 @@ async def process_confirm_deletion(callback_query: CallbackQuery):
             f"❌ <b><b>ꜰᴀɪʟᴇᴅ ᴏʀ ᴀʟʀᴇᴀᴅʏ ᴅᴇʟᴇᴛᴇᴅ ᴀᴄᴄᴏᴜɴᴛ</b></b> <code>{html.escape(phone)}</code>.",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
+                [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
             ])
         )
