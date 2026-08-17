@@ -413,7 +413,10 @@ async def process_chat_control_panel(callback_query: CallbackQuery, state: FSMCo
 
         if chat.type in [ChatType.PRIVATE, ChatType.BOT]:
             keyboard = [
-                [InlineKeyboardButton(text="sᴇɴᴅ ᴍᴇssᴀɢᴇ", callback_data=f"chat_act:send_msg:{chat.id}:{phone}:{page}")],
+                [
+                    InlineKeyboardButton(text="sᴇɴᴅ ᴍᴇssᴀɢᴇ", callback_data=f"chat_act:send_msg:{chat.id}:{phone}:{page}"),
+                    InlineKeyboardButton(text="ʀᴇᴀᴅ ᴍᴇssᴀɢᴇs", callback_data=f"chat_act:read_msg:{chat.id}:{phone}:{page}")
+                ],
                 [InlineKeyboardButton(text="ʙʟᴏᴄᴋ", callback_data=f"chat_act:block:{chat.id}:{phone}:{page}")],
             ]
             if chat.username:
@@ -424,7 +427,10 @@ async def process_chat_control_panel(callback_query: CallbackQuery, state: FSMCo
             if not is_admin:
                 text += "\n⚠️ <i>You're not admin/owner of this chat.</i>"
                 keyboard = [
-                    [InlineKeyboardButton(text="sᴇɴᴅ ᴍᴇssᴀɢᴇ", callback_data=f"chat_act:send_msg:{chat.id}:{phone}:{page}")],
+                    [
+                        InlineKeyboardButton(text="sᴇɴᴅ ᴍᴇssᴀɢᴇ", callback_data=f"chat_act:send_msg:{chat.id}:{phone}:{page}"),
+                        InlineKeyboardButton(text="ʀᴇᴀᴅ ᴍᴇssᴀɢᴇs", callback_data=f"chat_act:read_msg:{chat.id}:{phone}:{page}")
+                    ],
                     [InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"view_acc:{phone}:{page}")]
                 ]
             else:
@@ -435,6 +441,9 @@ async def process_chat_control_panel(callback_query: CallbackQuery, state: FSMCo
                     ],
                     [
                         InlineKeyboardButton(text="sᴇɴᴅ ᴍᴇssᴀɢᴇ", callback_data=f"chat_act:send_msg:{chat.id}:{phone}:{page}"),
+                        InlineKeyboardButton(text="ʀᴇᴀᴅ ᴍᴇssᴀɢᴇs", callback_data=f"chat_act:read_msg:{chat.id}:{phone}:{page}")
+                    ],
+                    [
                         InlineKeyboardButton(text="ᴘʀᴏᴍᴏᴛᴇ ᴀᴅᴍɪɴ", callback_data=f"chat_act:admin:{chat.id}:{phone}:{page}")
                     ],
                     [
@@ -452,6 +461,70 @@ async def process_chat_control_panel(callback_query: CallbackQuery, state: FSMCo
     finally:
         await client.stop()
 
+
+@router.callback_query(F.data.startswith("chat_act:read_msg:"))
+async def process_chat_read_messages(callback_query: CallbackQuery):
+    await callback_query.answer("Fetching messages...")
+    parts = callback_query.data.split(":")
+    chat_id = parts[2]
+    phone = parts[3]
+    page = parts[4]
+
+    acc = await get_account(phone, user_id=callback_query.from_user.id)
+    if not acc:
+        return
+
+    session_str = decrypt_data(acc["encrypted_session"])
+    client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
+
+    try:
+        await client.start()
+        try:
+            await client.resolve_peer(int(chat_id))
+        except Exception:
+            async for _ in client.get_dialogs(limit=100):
+                pass
+
+        messages = []
+        async for msg in client.get_chat_history(int(chat_id), limit=10):
+            sender = "Unknown"
+            if msg.from_user:
+                sender = msg.from_user.first_name or msg.from_user.username or str(msg.from_user.id)
+            elif msg.sender_chat:
+                sender = msg.sender_chat.title or str(msg.sender_chat.id)
+
+            text_content = msg.text or msg.caption or ""
+            media_tag = ""
+            if msg.photo:
+                media_tag = "[Photo] "
+            elif msg.video:
+                media_tag = "[Video] "
+            elif msg.document:
+                media_tag = "[Document] "
+            elif msg.audio:
+                media_tag = "[Audio] "
+            elif msg.voice:
+                media_tag = "[Voice] "
+            elif msg.sticker:
+                media_tag = "[Sticker] "
+
+            display_text = html.escape(f"{media_tag}{text_content}".strip())
+            if not display_text:
+                display_text = "[Unsupported Message]"
+
+            messages.append(f"<b>{html.escape(sender)}:</b> {display_text}")
+
+        if not messages:
+            await callback_query.message.answer("No messages found.")
+        else:
+            messages.reverse()
+            await callback_query.message.answer("📖 <b>Recent Messages</b>\n━━━━━━━━━━━━━━━━━━━━━\n" + "\n\n".join(messages), parse_mode="HTML")
+
+    except Exception as e:
+        logger.error(f"Error fetching chat history for {chat_id}: {e}")
+        await callback_query.message.answer(f"❌ Error fetching history: {e}")
+    finally:
+        await client.stop()
 
 @router.callback_query(F.data.startswith("chat_act:rename:"))
 async def process_chat_rename(callback_query: CallbackQuery, state: FSMContext):
@@ -491,6 +564,11 @@ async def handle_chat_rename(message: Message, state: FSMContext):
 
     try:
         await client.start()
+        try:
+            await client.resolve_peer(int(chat_id))
+        except Exception:
+            async for _ in client.get_dialogs(limit=100):
+                pass
         await client.set_chat_title(int(chat_id), new_title)
         await processing_msg.edit_text(f"✅ Chat title successfully changed to: <b>{html.escape(new_title)}</b>", parse_mode="HTML")
     except ChatAdminRequired:
@@ -542,6 +620,11 @@ async def handle_chat_photo(message: Message, state: FSMContext):
             f.write(downloaded_file.read())
 
         await client.start()
+        try:
+            await client.resolve_peer(int(chat_id))
+        except Exception:
+            async for _ in client.get_dialogs(limit=100):
+                pass
         await client.set_chat_photo(int(chat_id), photo=temp_path)
         await processing_msg.edit_text("✅ Chat photo successfully updated.")
     except ChatAdminRequired:
@@ -641,6 +724,11 @@ async def handle_chat_make_public(message: Message, state: FSMContext):
 
     try:
         await client.start()
+        try:
+            await client.resolve_peer(int(chat_id))
+        except Exception:
+            async for _ in client.get_dialogs(limit=100):
+                pass
         await client.set_chat_username(int(chat_id), username)
         await processing_msg.edit_text(f"✅ Chat is now public with username: <b>@{html.escape(username)}</b>", parse_mode="HTML")
         await state.clear()
@@ -708,6 +796,11 @@ async def handle_chat_promote_admin(message: Message, state: FSMContext):
 
     try:
         await client.start()
+        try:
+            await client.resolve_peer(int(chat_id))
+        except Exception:
+            async for _ in client.get_dialogs(limit=100):
+                pass
 
         # Grant basic admin privileges
         privileges = ChatPrivileges(
@@ -1025,6 +1118,11 @@ async def handle_chat_send_message(message: Message, state: FSMContext):
     temp_path = None
     try:
         await client.start()
+        try:
+            await client.resolve_peer(int(chat_id))
+        except Exception:
+            async for _ in client.get_dialogs(limit=100):
+                pass
 
         if message.photo:
             file_id = message.photo[-1].file_id
