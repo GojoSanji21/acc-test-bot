@@ -225,7 +225,7 @@ async def check_otp_logic(callback_query: CallbackQuery, phone: str, page: int):
 
     client = create_pyrogram_client(f"otp_{phone.replace('+', '')}", session_str, proxy, custom_api)
     try:
-        await client.connect()
+        await client.start()
 
         found = False
         async for msg in client.get_chat_history(777000, limit=5):
@@ -311,7 +311,7 @@ async def check_otp_logic(callback_query: CallbackQuery, phone: str, page: int):
     finally:
         try:
             if client.is_connected:
-                await client.disconnect()
+                await client.stop()
         except Exception:
             pass
 
@@ -623,7 +623,7 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
 
         client = create_pyrogram_client(f"det_{phone.replace('+', '')}", session_str, proxy, custom_api)
         try:
-            await client.connect()
+            await client.start()
             me = await client.get_me()
 
             # Estimate Account Creation Date and Age
@@ -702,7 +702,7 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
         finally:
             try:
                 if client.is_connected:
-                    await client.disconnect()
+                    await client.stop()
             except Exception:
                 pass
         return
@@ -720,7 +720,7 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
 
         client = create_pyrogram_client(f"ver_{phone.replace('+', '')}", session_str, proxy, custom_api)
         try:
-            await client.connect()
+            await client.start()
             me = await client.get_me()
             p_name = " ".join([p for p in [me.first_name or "", me.last_name or ""] if p.strip()]) or "ᴜɴᴋɴᴏᴡɴ"
 
@@ -759,7 +759,7 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
         finally:
             try:
                 if client.is_connected:
-                    await client.disconnect()
+                    await client.stop()
             except Exception:
                 pass
         return
@@ -876,7 +876,7 @@ async def process_send_message(message: Message, state: FSMContext):
     client = create_pyrogram_client(f"snd_{phone.replace('+', '')}", session_str, proxy, custom_api)
 
     try:
-        await client.connect()
+        await client.start()
         resolved_target = int(target) if target.isdigit() else target
 
         await client.send_message(chat_id=resolved_target, text=msg_text)
@@ -897,7 +897,7 @@ async def process_send_message(message: Message, state: FSMContext):
     finally:
         try:
             if client.is_connected:
-                await client.disconnect()
+                await client.stop()
         except Exception:
             pass
 
@@ -951,7 +951,7 @@ async def process_security_options(callback_query: CallbackQuery, state: FSMCont
 
         client = create_pyrogram_client(f"sess_{phone.replace('+', '')}", session_str, proxy, custom_api)
         try:
-            await client.connect()
+            await client.start()
             authorizations_obj = await client.invoke(raw.functions.account.GetAuthorizations())
             authorizations = authorizations_obj.authorizations
 
@@ -1005,7 +1005,7 @@ async def process_security_options(callback_query: CallbackQuery, state: FSMCont
         finally:
             try:
                 if client.is_connected:
-                    await client.disconnect()
+                    await client.stop()
             except Exception:
                 pass
         return
@@ -1066,7 +1066,7 @@ async def process_confirm_revoke_session(callback_query: CallbackQuery):
 
     client = create_pyrogram_client(f"rev_{phone.replace('+', '')}", session_str, proxy, custom_api)
     try:
-        await client.connect()
+        await client.start()
         await client.invoke(raw.functions.account.ResetAuthorization(hash=sess_hash))
 
         await callback_query.message.edit_text(
@@ -1087,7 +1087,7 @@ async def process_confirm_revoke_session(callback_query: CallbackQuery):
     finally:
         try:
             if client.is_connected:
-                await client.disconnect()
+                await client.stop()
         except Exception:
             pass
 
@@ -1117,7 +1117,7 @@ async def process_new_profile_name(message: Message, state: FSMContext):
     client = create_pyrogram_client(f"ren_{phone.replace('+', '')}", session_str, proxy, custom_api)
 
     try:
-        await client.connect()
+        await client.start()
         name_parts = new_name.split(" ", 1)
         first_n = name_parts[0]
         last_n = name_parts[1] if len(name_parts) > 1 else ""
@@ -1150,7 +1150,7 @@ async def process_new_profile_name(message: Message, state: FSMContext):
     finally:
         try:
             if client.is_connected:
-                await client.disconnect()
+                await client.stop()
         except Exception:
             pass
 
@@ -1179,7 +1179,7 @@ async def process_set_2fa_text(message: Message, state: FSMContext):
     client = create_pyrogram_client(f"sec_{phone.replace('+', '')}", session_str, proxy, custom_api)
 
     try:
-        await client.connect()
+        await client.start()
 
         if ":" in text:
             parts = text.split(":", 1)
@@ -1226,7 +1226,7 @@ async def process_set_2fa_text(message: Message, state: FSMContext):
     finally:
         try:
             if client.is_connected:
-                await client.disconnect()
+                await client.stop()
         except Exception:
             pass
 
@@ -1255,7 +1255,7 @@ async def process_remove_2fa_text(message: Message, state: FSMContext):
     client = create_pyrogram_client(f"sec_{phone.replace('+', '')}", session_str, proxy, custom_api)
 
     try:
-        await client.connect()
+        await client.start()
         await client.remove_cloud_password(password=pwd)
         await status_msg.edit_text(
             f"✅ <b>2ꜰᴀ ᴄʟᴏᴜᴅ ᴘᴀssᴡᴏʀᴅ ʀᴇᴍᴏᴠᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b>\n\n"
@@ -1273,7 +1273,7 @@ async def process_remove_2fa_text(message: Message, state: FSMContext):
     finally:
         try:
             if client.is_connected:
-                await client.disconnect()
+                await client.stop()
         except Exception:
             pass
 

@@ -110,8 +110,8 @@ async def send_help(message: Message):
 async def remove_all_confirm_callback(callback_query: CallbackQuery):
     await callback_query.answer()
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ Yes, Delete All", callback_data="menu:remove_all_yes")],
-        [InlineKeyboardButton(text="❌ Cancel", callback_data="menu:main")]
+        [InlineKeyboardButton(text="✅ ʏᴇs, ᴅᴇʟᴇᴛᴇ ᴀʟʟ", callback_data="menu:remove_all_yes")],
+        [InlineKeyboardButton(text="❌ ᴄᴀɴᴄᴇʟ", callback_data="menu:main")]
     ])
     await callback_query.message.edit_text(
         "⚠️ <b>Are you sure you want to delete ALL saved sessions? This cannot be undone.</b>",
