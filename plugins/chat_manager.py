@@ -534,8 +534,13 @@ async def process_chat_rename(callback_query: CallbackQuery, state: FSMContext):
     phone = parts[3]
     page = parts[4]
 
+    acc = await get_account(phone, user_id=callback_query.from_user.id)
+    if not acc:
+        return
+    session_string = decrypt_data(acc["encrypted_session"])
+
     await state.set_state(ChatManagerState.change_name)
-    await state.update_data(chat_id=chat_id, phone=phone, page=page)
+    await state.update_data(chat_id=chat_id, phone=phone, page=page, session_string=session_string)
 
     await callback_query.message.edit_text("📝 Send the new title for the chat:\n\nSend /cancel to abort.", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ᴄᴀɴᴄᴇʟ", callback_data=f"chat_ctrl:{chat_id}:{phone}:{page}")]]))
 
@@ -550,26 +555,29 @@ async def handle_chat_rename(message: Message, state: FSMContext):
     chat_id = data.get("chat_id")
     phone = data.get("phone")
     page = data.get("page")
+    session_string = data.get("session_string")
 
-    acc = await get_account(phone, user_id=message.from_user.id)
-    if not acc:
-        await state.clear()
-        return
+    if not session_string:
+        acc = await get_account(phone, user_id=message.from_user.id)
+        if not acc:
+            await state.clear()
+            return
+        session_string = decrypt_data(acc["encrypted_session"])
 
     new_title = message.text
-    session_str = decrypt_data(acc["encrypted_session"])
-    client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
+    client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_string)
 
     processing_msg = await message.reply("🔄 Processing...")
 
     try:
         await client.start()
         try:
-            await client.resolve_peer(int(chat_id))
+            await client.set_chat_title(int(chat_id), new_title)
         except Exception:
             async for _ in client.get_dialogs(limit=100):
                 pass
-        await client.set_chat_title(int(chat_id), new_title)
+            await client.set_chat_title(int(chat_id), new_title)
+
         await processing_msg.edit_text(f"✅ Chat title successfully changed to: <b>{html.escape(new_title)}</b>", parse_mode="HTML")
     except ChatAdminRequired:
         await processing_msg.edit_text("❌ You don't have admin rights to change the title.")
@@ -672,7 +680,7 @@ async def process_chat_privacy(callback_query: CallbackQuery, state: FSMContext)
         else:
             # It's private, let's make it public by prompting for username
             await state.set_state(ChatManagerState.make_public)
-            await state.update_data(chat_id=chat_id, phone=phone, page=page)
+            await state.update_data(chat_id=chat_id, phone=phone, page=page, session_string=session_str)
             await callback_query.message.edit_text("🔗 Send the new username (without @) to make the chat public:\n\nSend /cancel to abort.", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ᴄᴀɴᴄᴇʟ", callback_data=f"chat_ctrl:{chat_id}:{phone}:{page}")]]))
     except ChatAdminRequired:
         await callback_query.message.edit_text("❌ You don't have admin rights to change privacy.", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"chat_ctrl:{chat_id}:{phone}:{page}")]]))
@@ -691,8 +699,13 @@ async def process_retry_make_public(callback_query: CallbackQuery, state: FSMCon
     page = int(parts[2]) if len(parts) > 2 else 0
     chat_id = parts[3]
 
+    acc = await get_account(phone, user_id=callback_query.from_user.id)
+    if not acc:
+        return
+    session_str = decrypt_data(acc["encrypted_session"])
+
     await state.set_state(ChatManagerState.make_public)
-    await state.update_data(chat_id=chat_id, phone=phone, page=page)
+    await state.update_data(chat_id=chat_id, phone=phone, page=page, session_string=session_str)
 
     await callback_query.message.edit_text(
         "🔗 Send the new username (without @) to make the chat public:\n\nSend /cancel to abort.",
@@ -710,14 +723,16 @@ async def handle_chat_make_public(message: Message, state: FSMContext):
     chat_id = data.get("chat_id")
     phone = data.get("phone")
     page = data.get("page")
+    session_str = data.get("session_string")
 
-    acc = await get_account(phone, user_id=message.from_user.id)
-    if not acc:
-        await state.clear()
-        return
+    if not session_str:
+        acc = await get_account(phone, user_id=message.from_user.id)
+        if not acc:
+            await state.clear()
+            return
+        session_str = decrypt_data(acc["encrypted_session"])
 
     username = message.text.replace("@", "").strip()
-    session_str = decrypt_data(acc["encrypted_session"])
     client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
 
     processing_msg = await message.reply("🔄 Processing...")
@@ -725,11 +740,12 @@ async def handle_chat_make_public(message: Message, state: FSMContext):
     try:
         await client.start()
         try:
-            await client.resolve_peer(int(chat_id))
+            await client.set_chat_username(int(chat_id), username)
         except Exception:
             async for _ in client.get_dialogs(limit=100):
                 pass
-        await client.set_chat_username(int(chat_id), username)
+            await client.set_chat_username(int(chat_id), username)
+
         await processing_msg.edit_text(f"✅ Chat is now public with username: <b>@{html.escape(username)}</b>", parse_mode="HTML")
         await state.clear()
     except (UsernameOccupied, UsernameInvalid) as e:
@@ -758,8 +774,13 @@ async def process_chat_promote_admin(callback_query: CallbackQuery, state: FSMCo
     phone = parts[3]
     page = parts[4]
 
+    acc = await get_account(phone, user_id=callback_query.from_user.id)
+    if not acc:
+        return
+    session_string = decrypt_data(acc["encrypted_session"])
+
     await state.set_state(ChatManagerState.promote_admin)
-    await state.update_data(chat_id=chat_id, phone=phone, page=page)
+    await state.update_data(chat_id=chat_id, phone=phone, page=page, session_string=session_string)
 
     await callback_query.message.edit_text("👑 Send the user ID or @username to promote to admin:\n\nSend /cancel to abort.", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ᴄᴀɴᴄᴇʟ", callback_data=f"chat_ctrl:{chat_id}:{phone}:{page}")]]))
 
@@ -776,11 +797,14 @@ async def handle_chat_promote_admin(message: Message, state: FSMContext):
     chat_id = data.get("chat_id")
     phone = data.get("phone")
     page = data.get("page")
+    session_string = data.get("session_string")
 
-    acc = await get_account(phone, user_id=message.from_user.id)
-    if not acc:
-        await state.clear()
-        return
+    if not session_string:
+        acc = await get_account(phone, user_id=message.from_user.id)
+        if not acc:
+            await state.clear()
+            return
+        session_string = decrypt_data(acc["encrypted_session"])
 
     user_target = message.text.strip()
     # Try converting to int if possible
@@ -789,18 +813,12 @@ async def handle_chat_promote_admin(message: Message, state: FSMContext):
     except ValueError:
         pass
 
-    session_str = decrypt_data(acc["encrypted_session"])
-    client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
+    client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_string)
 
     processing_msg = await message.reply("🔄 Promoting user...")
 
     try:
         await client.start()
-        try:
-            await client.resolve_peer(int(chat_id))
-        except Exception:
-            async for _ in client.get_dialogs(limit=100):
-                pass
 
         # Grant basic admin privileges
         privileges = ChatPrivileges(
@@ -816,7 +834,13 @@ async def handle_chat_promote_admin(message: Message, state: FSMContext):
             can_pin_messages=True
         )
 
-        await client.promote_chat_member(int(chat_id), user_target, privileges)
+        try:
+            await client.promote_chat_member(int(chat_id), user_target, privileges)
+        except Exception:
+            async for _ in client.get_dialogs(limit=100):
+                pass
+            await client.promote_chat_member(int(chat_id), user_target, privileges)
+
         await processing_msg.edit_text(f"✅ User successfully promoted to admin.")
     except ChatAdminRequired:
         await processing_msg.edit_text("❌ You don't have admin rights to promote members.")
@@ -1083,8 +1107,13 @@ async def process_chat_send_message(callback_query: CallbackQuery, state: FSMCon
     phone = parts[3]
     page = parts[4]
 
+    acc = await get_account(phone, user_id=callback_query.from_user.id)
+    if not acc:
+        return
+    session_string = decrypt_data(acc["encrypted_session"])
+
     await state.set_state(ChatManagerState.send_message)
-    await state.update_data(chat_id=chat_id, phone=phone, page=page)
+    await state.update_data(chat_id=chat_id, phone=phone, page=page, session_string=session_string)
 
     await callback_query.message.edit_text("💬 Send the message you want to forward or send to this chat (Text, Photo, or Forwarded Message):\n\nSend /cancel to abort.", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ᴄᴀɴᴄᴇʟ", callback_data=f"chat_ctrl:{chat_id}:{phone}:{page}")]]))
 
@@ -1104,25 +1133,22 @@ async def handle_chat_send_message(message: Message, state: FSMContext):
     chat_id = data.get("chat_id")
     phone = data.get("phone")
     page = data.get("page")
+    session_string = data.get("session_string")
 
-    acc = await get_account(phone, user_id=message.from_user.id)
-    if not acc:
-        await state.clear()
-        return
+    if not session_string:
+        acc = await get_account(phone, user_id=message.from_user.id)
+        if not acc:
+            await state.clear()
+            return
+        session_string = decrypt_data(acc["encrypted_session"])
 
-    session_str = decrypt_data(acc["encrypted_session"])
-    client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_str)
+    client = create_pyrogram_client(session_name=f"mgmt_{uuid.uuid4().hex[:8]}", session_string=session_string)
 
     processing_msg = await message.reply("🔄 Sending message...")
 
     temp_path = None
     try:
         await client.start()
-        try:
-            await client.resolve_peer(int(chat_id))
-        except Exception:
-            async for _ in client.get_dialogs(limit=100):
-                pass
 
         if message.photo:
             file_id = message.photo[-1].file_id
@@ -1133,10 +1159,21 @@ async def handle_chat_send_message(message: Message, state: FSMContext):
             with open(temp_path, 'wb') as f:
                 f.write(downloaded_file.read())
 
-            await client.send_photo(chat_id=int(chat_id), photo=temp_path, caption=message.caption or "")
+            try:
+                await client.send_photo(chat_id=int(chat_id), photo=temp_path, caption=message.caption or "")
+            except Exception:
+                async for _ in client.get_dialogs(limit=100):
+                    pass
+                await client.send_photo(chat_id=int(chat_id), photo=temp_path, caption=message.caption or "")
 
         elif message.text:
-            await client.send_message(chat_id=int(chat_id), text=message.text)
+            try:
+                await client.send_message(chat_id=int(chat_id), text=message.text)
+            except Exception:
+                async for _ in client.get_dialogs(limit=100):
+                    pass
+                await client.send_message(chat_id=int(chat_id), text=message.text)
+
         elif message.video:
             file_id = message.video.file_id
             file_info = await message.bot.get_file(file_id)
@@ -1146,8 +1183,12 @@ async def handle_chat_send_message(message: Message, state: FSMContext):
             with open(temp_path, 'wb') as f:
                 f.write(downloaded_file.read())
 
-            await client.send_video(chat_id=int(chat_id), video=temp_path, caption=message.caption or "")
-
+            try:
+                await client.send_video(chat_id=int(chat_id), video=temp_path, caption=message.caption or "")
+            except Exception:
+                async for _ in client.get_dialogs(limit=100):
+                    pass
+                await client.send_video(chat_id=int(chat_id), video=temp_path, caption=message.caption or "")
         else:
             await processing_msg.edit_text("❌ Unsupported message type.")
             return
