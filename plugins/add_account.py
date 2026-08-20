@@ -205,7 +205,7 @@ async def cancel_handler(message: Message, state: FSMContext):
     if client:
         try:
             if client.is_connected:
-                await client.disconnect()
+                await client.stop()
         except Exception as e:
             logger.error(f"Error disconnecting client on cancel: {e}")
     await state.clear()
@@ -226,7 +226,7 @@ async def cancel_add_callback(callback_query: CallbackQuery, state: FSMContext):
     if client:
         try:
             if client.is_connected:
-                await client.disconnect()
+                await client.stop()
         except Exception as e:
             logger.error(f"Error disconnecting client on cancel: {e}")
     await state.clear()
@@ -429,7 +429,7 @@ async def process_telethon_bulk_import(message: Message, state: FSMContext, uniq
 
             client = create_pyrogram_client(session_name=temp_name, session_string=pyro_str, proxy=proxy)
 
-            await client.connect()
+            await client.start()
             me = await client.get_me()
             if not me:
                 raise ValueError("Could not retrieve account identity from get_me()")
@@ -448,7 +448,7 @@ async def process_telethon_bulk_import(message: Message, state: FSMContext, uniq
 
             exported_session_str = await client.export_session_string()
             encrypted_session = encrypt_data(exported_session_str)
-            await client.disconnect()
+            await client.stop()
 
             saved = await save_account(
                 phone=phone,
@@ -464,7 +464,7 @@ async def process_telethon_bulk_import(message: Message, state: FSMContext, uniq
 
         except AuthKeyInvalid:
             expired_sessions.append((source_name, "Session Expired / Revoked"))
-            try: await client.disconnect()
+            try: await client.stop()
             except: pass
         except Exception as err:
             err_str = str(err)
@@ -472,7 +472,7 @@ async def process_telethon_bulk_import(message: Message, state: FSMContext, uniq
                 expired_sessions.append((source_name, "Account Deactivated by Telegram"))
             else:
                 other_failed_sessions.append((source_name, err_str))
-            try: await client.disconnect()
+            try: await client.stop()
             except: pass
 
     summary_text = (
@@ -671,7 +671,7 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                             client = create_pyrogram_client(session_name=temp_name, session_string=s_data, proxy=proxy)
                             
                         try:
-                            await client.connect()
+                            await client.start()
                             me = await client.get_me()
                             if not me:
                                 raise ValueError("Could not retrieve account identity from get_me()")
@@ -699,7 +699,7 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                             
                             # Encrypt and save securely
                             encrypted_session = encrypt_data(exported_session_str)
-                            await client.disconnect()
+                            await client.stop()
                             
                             saved = await save_account(
                                 phone=phone,
@@ -716,7 +716,7 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                             logger.error(f"Session {source_name} is expired/revoked: AuthKeyInvalid")
                             expired_sessions.append((source_name, "Session Expired / Revoked"))
                             try:
-                                await client.disconnect()
+                                await client.stop()
                             except:
                                 pass
                         except Exception as conn_err:
@@ -727,7 +727,7 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                             else:
                                 other_failed_sessions.append((source_name, err_str))
                             try:
-                                await client.disconnect()
+                                await client.stop()
                             except:
                                 pass
                                 
@@ -789,7 +789,7 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                         session_str = parse_sqlite_to_pyrogram_string(str(dest_path), API_ID)
                         temp_name = f"sess_telethon_{message.from_user.id}"
                         client = create_pyrogram_client(session_name=temp_name, session_string=session_str, proxy=proxy)
-                        await client.connect()
+                        await client.start()
                     except Exception as parse_e:
                         raise ValueError(f"Could not find or parse session data: {parse_e}")
 
@@ -821,7 +821,7 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
 
                     # Encrypt and save securely
                     encrypted_session = encrypt_data(session_str_final)
-                    await client.disconnect()
+                    await client.stop()
                     
                     success = await save_account(
                         phone=phone,
@@ -862,7 +862,7 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                         reply_markup=get_back_keyboard()
                     )
                     try:
-                        await client.disconnect()
+                        await client.stop()
                     except:
                         pass
                     return
@@ -920,7 +920,7 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
         client = create_pyrogram_client(session_name=temp_name, session_string=session_str, proxy=proxy)
         
         try:
-            await client.connect()
+            await client.start()
             me = await client.get_me()
             if not me:
                 raise ValueError("Could not retrieve account identity from get_me()")
@@ -941,7 +941,7 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
             
             # Encrypt and save securely
             encrypted_session = encrypt_data(session_str)
-            await client.disconnect()
+            await client.stop()
             
             success = await save_account(
                 phone=phone,
@@ -984,7 +984,7 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                 reply_markup=get_back_keyboard()
             )
             try:
-                await client.disconnect()
+                await client.stop()
             except:
                 pass
     finally:
@@ -1024,7 +1024,7 @@ async def process_phone(message: Message, state: FSMContext):
     try:
         session_name = f"sess_{phone.replace('+', '')}"
         client = create_pyrogram_client(session_name=session_name, proxy=proxy)
-        await client.connect()
+        await client.start()
         code_info = await client.send_code(phone)
         phone_code_hash = code_info.phone_code_hash
         await state.update_data(
@@ -1093,7 +1093,7 @@ async def process_otp(message: Message, state: FSMContext):
             parse_mode="HTML",
             reply_markup=get_back_keyboard()
         )
-        await client.disconnect()
+        await client.stop()
         await state.clear()
     except Exception as e:
         logger.exception("Error during sign_in")
@@ -1102,7 +1102,7 @@ async def process_otp(message: Message, state: FSMContext):
             parse_mode="HTML",
             reply_markup=get_back_keyboard()
         )
-        await client.disconnect()
+        await client.stop()
         await state.clear()
 
 @router.message(AddAccountStates.waiting_for_2fa)
@@ -1151,7 +1151,7 @@ async def finalize_account_registration(message: Message, state: FSMContext, cli
             
         session_str = await client.export_session_string()
         encrypted_session = encrypt_data(session_str)
-        await client.disconnect()
+        await client.stop()
         
         success = await save_account(
             phone=phone,
@@ -1188,7 +1188,7 @@ async def finalize_account_registration(message: Message, state: FSMContext, cli
             reply_markup=get_back_keyboard()
         )
         try:
-            await client.disconnect()
+            await client.stop()
         except:
             pass
     finally:

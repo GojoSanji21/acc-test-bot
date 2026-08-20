@@ -264,7 +264,7 @@ async def cleanup_otp_listener(phone: str):
         if client:
             try:
                 if client.is_connected:
-                    await client.disconnect()
+                    await client.stop()
                 logger.info(f"Disconnected OTP listener client for {phone}")
             except Exception as e:
                 logger.error(f"Error disconnecting OTP client {phone}: {e}")
