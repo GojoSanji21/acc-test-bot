@@ -69,14 +69,12 @@ IMAGES = [
     'https://graph.org/file/13b0eaf75f4ffd28cd445-6e5b90592458fc05f1.jpg'
 ]
 
-
 router = Router()
 
 class SecurityStates(StatesGroup):
     waiting_for_new_2fa = State()
     waiting_for_remove_2fa = State()
     waiting_for_new_name = State()
-
 
 class SearchAccounts(StatesGroup):
     waiting_for_query = State()
@@ -233,21 +231,19 @@ async def check_otp_logic(callback_query: CallbackQuery, phone: str, page: int):
     Directly scans the inbox history of official Telegram service (777000)
     to fetch any active OTP verification code instantly.
     """
-    # 1. Instantly trigger the toast popup header!
     try:
         await callback_query.answer("🔍 ᴄʜᴇᴄᴋɪɴɢ ꜰᴏʀ ᴛʜᴇ ʟᴀᴛᴇsᴛ ᴏᴛᴘ ᴏɴ ᴀᴄᴄᴏᴜɴᴛ...", show_alert=False)
     except Exception as e:
         logger.warning(f"Could not answer callback query at check_otp_logic start: {e}")
 
-    # 2. Show loading message
     await callback_query.message.edit_text(
         f"⏳ <b>sᴄᴀɴɴɪɴɢ ʏᴏᴜʀ ɪɴʙᴏx ꜰᴏʀ ᴛʜᴇ ʟᴀᴛᴇsᴛ ᴏᴛᴘ ᴄᴏᴅᴇ ᴏɴ</b> <code>{html.escape(phone)}</code>... <b>ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ.</b>",
-        parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+        parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
     )
 
     acc = await get_account(phone, user_id=callback_query.from_user.id)
     if not acc:
-        await callback_query.message.edit_text("<b>sᴇʟᴇᴄᴛᴇᴅ ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True))
+        await callback_query.message.edit_text("<b>sᴇʟᴇᴄᴛᴇᴅ ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True))
         return
 
     session_str = decrypt_data(acc["encrypted_session"])
@@ -267,7 +263,6 @@ async def check_otp_logic(callback_query: CallbackQuery, phone: str, page: int):
                     otp_code = otp_match.group(1)
                     escaped_text = html.escape(text)
 
-                    # Native Telegram Alert Dialog containing the code!
                     try:
                         await callback_query.bot.answer_callback_query(
                             callback_query_id=callback_query.id,
@@ -296,13 +291,12 @@ async def check_otp_logic(callback_query: CallbackQuery, phone: str, page: int):
                     await callback_query.message.edit_text(
                         success_text,
                         reply_markup=InlineKeyboardMarkup(inline_keyboard=refresh_kbd),
-                        parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+                        parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
                     )
                     found = True
                     break
 
         if not found:
-            # Native Telegram Alert Dialog showing no OTP
             try:
                 await callback_query.bot.answer_callback_query(
                     callback_query_id=callback_query.id,
@@ -330,14 +324,14 @@ async def check_otp_logic(callback_query: CallbackQuery, phone: str, page: int):
             await callback_query.message.edit_text(
                 fail_text,
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=refresh_kbd),
-                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
             )
 
     except Exception as e:
         await callback_query.message.edit_text(
             f"<b>ꜰᴀɪʟᴇᴅ ᴛᴏ sᴄᴀɴ ɪɴʙᴏx:</b> <code>{html.escape(str(e))}</code>",
             reply_markup=get_back_to_panel_keyboard(phone, page),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
     finally:
         try:
@@ -357,16 +351,15 @@ async def list_accounts_callback(callback_query: CallbackQuery, state: FSMContex
         try:
             await callback_query.message.edit_text(
                 f"<b>{text}</b>",
-                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True),
+                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True),
                 reply_markup=get_back_keyboard()
             )
         except Exception:
             await callback_query.message.delete()
             await callback_query.message.answer(
                 f"<b>{text}</b>",
-                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True),
+                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True),
                 reply_markup=get_back_keyboard(),
-
             )
         return
 
@@ -374,17 +367,15 @@ async def list_accounts_callback(callback_query: CallbackQuery, state: FSMContex
     try:
         await callback_query.message.edit_text(
             f"<b>{text}</b>",
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True),
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True),
             reply_markup=get_accounts_keyboard(accounts, page=0),
-
         )
     except Exception:
         await callback_query.message.delete()
         await callback_query.message.answer(
             f"<b>{text}</b>",
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True),
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True),
             reply_markup=get_accounts_keyboard(accounts, page=0),
-
         )
 
 @router.callback_query(F.data.startswith("list_page:"))
@@ -401,16 +392,14 @@ async def process_list_pagination(callback_query: CallbackQuery):
         await callback_query.message.edit_text(
             f"<b>{text}</b>",
             reply_markup=get_accounts_keyboard(accounts, page=page),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True),
-
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True),
         )
     except Exception:
         await callback_query.message.delete()
         await callback_query.message.answer(
             f"<b>{text}</b>",
             reply_markup=get_accounts_keyboard(accounts, page=page),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True),
-
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True),
         )
 
 @router.callback_query(F.data.startswith("back_to_list:"))
@@ -423,14 +412,14 @@ async def process_back_to_list(callback_query: CallbackQuery):
         await callback_query.message.edit_text(
             "<b><b>ɴᴏ sᴀᴠᴇᴅ ᴛᴇʟᴇɢʀᴀᴍ ᴀᴄᴄᴏᴜɴᴛs ꜰᴏᴜɴᴅ ɪɴ ᴛʜᴇ ᴅᴀᴛᴀʙᴀsᴇ.</b></b>",
             reply_markup=get_back_keyboard(),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
         return
 
     await callback_query.message.edit_text(
         "<b>sᴇʟᴇᴄᴛ ᴀɴ ᴀᴄᴄᴏᴜɴᴛ ꜰʀᴏᴍ ᴛʜᴇ ʟɪsᴛ:</b>",
         reply_markup=get_accounts_keyboard(accounts, page=page),
-        parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+        parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
     )
 
 @router.callback_query(F.data.startswith("check_otp:"))
@@ -445,13 +434,13 @@ async def list_accounts_handler(message: Message, state: FSMContext):
     await state.clear()
     accounts = await get_all_accounts(user_id=message.from_user.id)
     if not accounts:
-        await message.answer("<b>ɴᴏ sᴀᴠᴇᴅ ᴛᴇʟᴇɢʀᴀᴍ ᴀᴄᴄᴏᴜɴᴛs ꜰᴏᴜɴᴅ ɪɴ ᴛʜᴇ ᴅᴀᴛᴀʙᴀsᴇ.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True))
+        await message.answer("<b>ɴᴏ sᴀᴠᴇᴅ ᴛᴇʟᴇɢʀᴀᴍ ᴀᴄᴄᴏᴜɴᴛs ꜰᴏᴜɴᴅ ɪɴ ᴛʜᴇ ᴅᴀᴛᴀʙᴀsᴇ.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True))
         return
 
     await message.answer(
         "<b>sᴇʟᴇᴄᴛ ᴀɴ ᴀᴄᴄᴏᴜɴᴛ ꜰʀᴏᴍ ᴛʜᴇ ʟɪsᴛ:</b>",
         reply_markup=get_accounts_keyboard(accounts, page=0),
-        parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+        parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
     )
 
 @router.callback_query(F.data.startswith("view_acc:"))
@@ -466,10 +455,10 @@ async def view_account_panel(callback_query: CallbackQuery, state: FSMContext):
     acc = await get_account(phone, user_id=callback_query.from_user.id)
     if not acc:
         try:
-            await callback_query.message.edit_text("<b>sᴇʟᴇᴄᴛᴇᴅ ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True))
+            await callback_query.message.edit_text("<b>sᴇʟᴇᴄᴛᴇᴅ ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True))
         except Exception:
             await callback_query.message.delete()
-            await callback_query.message.answer("<b>sᴇʟᴇᴄᴛᴇᴅ ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True))
+            await callback_query.message.answer("<b>sᴇʟᴇᴄᴛᴇᴅ ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True))
         return
 
     p_name = acc.get("profile_name") or "unknown"
@@ -519,16 +508,14 @@ async def view_account_panel(callback_query: CallbackQuery, state: FSMContext):
         await callback_query.message.edit_text(
             text,
             reply_markup=InlineKeyboardMarkup(inline_keyboard=panel_keyboard),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True),
-
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True),
         )
     except Exception:
         await callback_query.message.delete()
         await callback_query.message.answer(
             text,
             reply_markup=InlineKeyboardMarkup(inline_keyboard=panel_keyboard),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True),
-
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True),
         )
 
 @router.callback_query(F.data.startswith("format_sel:"))
@@ -545,7 +532,7 @@ async def process_format_selection(callback_query: CallbackQuery):
 
     acc = await get_account(phone, user_id=callback_query.from_user.id)
     if not acc:
-        await callback_query.message.edit_text("<b>ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True))
+        await callback_query.message.edit_text("<b>ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True))
         return
 
     session_str = decrypt_data(acc["encrypted_session"])
@@ -573,14 +560,14 @@ async def process_format_selection(callback_query: CallbackQuery):
         await callback_query.message.edit_text(
             extract_text,
             reply_markup=get_back_to_panel_keyboard(phone, page),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
         return
 
     if action == "export":
         await callback_query.message.edit_text(
             f"⏳ <b>ɢᴇɴᴇʀᴀᴛɪɴɢ sᴇssɪᴏɴ ꜰɪʟᴇ ꜰᴏʀ</b> <code>{html.escape(phone)}</code>... <b>ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ.</b>",
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
 
         temp_dir = Path("temp_sessions")
@@ -602,24 +589,24 @@ async def process_format_selection(callback_query: CallbackQuery):
                     chat_id=callback_query.message.chat.id,
                     document=FSInputFile(str(file_path)),
                     caption=f"<b>sᴇssɪᴏɴ ᴇxᴘᴏʀᴛᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b>\n\n<b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>",
-                    parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+                    parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
                 )
                 await callback_query.message.edit_text(
                     f"<b>sᴇssɪᴏɴ ꜰɪʟᴇ sᴇɴᴛ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b>\n\n<b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>",
                     reply_markup=get_back_to_panel_keyboard(phone, page),
-                    parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+                    parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
                 )
             else:
                 await callback_query.message.edit_text(
                     f"<b>ꜰᴀɪʟᴇᴅ ᴛᴏ ᴇxᴘᴏʀᴛ sᴇssɪᴏɴ:</b> file was not created.",
                     reply_markup=get_back_to_panel_keyboard(phone, page),
-                    parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+                    parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
                 )
         except Exception as e:
             await callback_query.message.edit_text(
                 f"<b>ꜰᴀɪʟᴇᴅ ᴛᴏ ᴇxᴘᴏʀᴛ sᴇssɪᴏɴ:</b> <code>{html.escape(str(e))}</code>",
                 reply_markup=get_back_to_panel_keyboard(phone, page),
-                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
             )
         finally:
             if file_path and file_path.exists():
@@ -631,7 +618,6 @@ async def process_format_selection(callback_query: CallbackQuery):
 
 @router.callback_query(F.data.startswith("acc_opt:"))
 async def process_account_options(callback_query: CallbackQuery, state: FSMContext):
-    # Instantly answer the callback query to stop the button loader spinning circle immediately!
     await callback_query.answer()
 
     bot = callback_query.bot
@@ -642,10 +628,9 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
 
     acc = await get_account(phone, user_id=callback_query.from_user.id)
     if not acc:
-        await callback_query.message.edit_text("<b>ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True))
+        await callback_query.message.edit_text("<b>ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True))
         return
 
-    # Handle delete option
     if action == "delete":
         confirm_kbd = [
             [
@@ -657,16 +642,14 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
             f"<b>ᴀʀᴇ ʏᴏᴜ sᴜʀᴇ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴅᴇʟᴇᴛᴇ <code>{html.escape(phone)}</code>?</b>\n\n"
             "ᴛʜɪs ᴀᴄᴛɪᴏɴ ɪs ɪʀʀᴇᴠᴇʀsɪʙʟᴇ ᴀɴᴅ ᴛʜᴇ sᴇssɪᴏɴ sᴛʀɪɴɢ ᴡɪʟʟ ʙᴇ ᴘᴇʀᴍᴀɴᴇɴᴛʟʏ ᴡɪᴘᴇᴅ.",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=confirm_kbd),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
         return
 
-    # Handle OTP Codes option
     if action == "otp":
         await check_otp_logic(callback_query, phone, page)
         return
 
-    # Handle Send option
     if action == "send":
         await state.update_data(phone=phone, page=page)
         await callback_query.message.edit_text(
@@ -674,16 +657,15 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
             "ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴛʜᴇ <b>ᴜsᴇʀ ɪᴅ, ᴜsᴇʀɴᴀᴍᴇ, ᴏʀ ᴛ.ᴍᴇ ʟɪɴᴋ</b> of the target recipient:\n\n"
             "ᴘʀᴇss ᴄᴀɴᴄᴇʟ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ᴀʙᴏʀᴛ.",
             reply_markup=get_back_to_panel_keyboard(phone, page),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
         await state.set_state(SendStates.waiting_for_target)
         return
 
-    # Handle Details option
     if action == "details":
         await callback_query.message.edit_text(
             f"⏳ <b>ꜰᴇᴛᴄʜɪɴɢ ᴀᴄᴄᴏᴜɴᴛ ᴅᴇᴛᴀɪʟs ꜰᴏʀ</b> <code>{html.escape(phone)}</code>... <b>ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ.</b>",
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
 
         session_str = decrypt_data(acc["encrypted_session"])
@@ -695,10 +677,8 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
             await client.start()
             me = await client.get_me()
 
-            # Estimate Account Creation Date and Age
             creation_date, account_age = estimate_account_age(me.id)
 
-            # Fetch 2FA Status / Hint
             two_fa_status = "ᴅɪsᴀʙʟᴇᴅ"
             hint_str = "ɴᴏɴᴇ"
             try:
@@ -713,7 +693,6 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
             username = f"@{me.username}" if me.username else "ɴᴏɴᴇ"
             proxy_info = f"<code>{html.escape(proxy['hostname'])}:{proxy['port']}</code>" if proxy else "ᴅɪʀᴇᴄᴛ ᴄᴏɴɴᴇᴄᴛɪᴏɴ"
 
-            # Map Trust/Verification Fields
             premium_status = "" if getattr(me, "is_premium", False) else "✖️"
             restricted_status = "" if getattr(me, "is_restricted", False) else "✖️"
             bot_status = "Yes" if getattr(me, "is_bot", False) else "No"
@@ -754,19 +733,19 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
             await callback_query.message.edit_text(
                 details_text,
                 reply_markup=get_back_to_panel_keyboard(phone, page),
-                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
             )
         except AuthKeyInvalid:
             await callback_query.message.edit_text(
                 f"<b>sᴇssɪᴏɴ ɪs ɪɴᴠᴀʟɪᴅ / ᴇxᴘɪʀᴇᴅ</b> ꜰᴏʀ <code>{html.escape(phone)}</code>.",
                 reply_markup=get_back_to_panel_keyboard(phone, page),
-                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
             )
         except Exception as e:
             await callback_query.message.edit_text(
                 f"<b>ꜰᴀɪʟᴇᴅ ᴛᴏ ꜰᴇᴛᴄʜ ᴅᴇᴛᴀɪʟs:</b> <code>{html.escape(str(e))}</code>",
                 reply_markup=get_back_to_panel_keyboard(phone, page),
-                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
             )
         finally:
             try:
@@ -776,11 +755,10 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
                 pass
         return
 
-    # Handle Verify option
     if action == "verify":
         await callback_query.message.edit_text(
             f"⏳ <b><b>ᴠᴇʀɪꜰʏɪɴɢ sᴇssɪᴏɴ status ꜰᴏʀ</b></b> <code>{html.escape(phone)}</code>... <b>ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ.</b>",
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
 
         session_str = decrypt_data(acc["encrypted_session"])
@@ -793,7 +771,6 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
             me = await client.get_me()
             p_name = " ".join([p for p in [me.first_name or "", me.last_name or ""] if p.strip()]) or "ᴜɴᴋɴᴏᴡɴ"
 
-            # Save the latest profile name to database
             await save_account(
                 phone=phone,
                 encrypted_session=acc["encrypted_session"],
@@ -809,7 +786,7 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
                 f"<b>ɴᴀᴍᴇ:</b> <code>{html.escape(p_name)}</code>\n"
                 f"<b>sᴛᴀᴛᴜs:</b> <b>ᴀᴄᴛɪᴠᴇ &amp; ᴠᴇʀɪꜰɪᴇᴅ</b> on ᴛᴇʟᴇɢʀᴀᴍ sᴇʀᴠᴇʀs.",
                 reply_markup=get_back_to_panel_keyboard(phone, page),
-                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
             )
         except AuthKeyInvalid:
             await callback_query.message.edit_text(
@@ -817,13 +794,13 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
                 f"<b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>\n"
                 f"<b>sᴛᴀᴛᴜs:</b> <b>ᴇxᴘɪʀᴇᴅ ᴏʀ ᴛᴇʀᴍɪɴᴀᴛᴇᴅ</b> by ᴜsᴇʀ.",
                 reply_markup=get_back_to_panel_keyboard(phone, page),
-                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
             )
         except Exception as e:
             await callback_query.message.edit_text(
                 f"<b>ᴠᴇʀɪꜰɪᴄᴀᴛɪᴏɴ ꜰᴀɪʟᴇᴅ:</b> <code>{html.escape(str(e))}</code>",
                 reply_markup=get_back_to_panel_keyboard(phone, page),
-                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
             )
         finally:
             try:
@@ -833,7 +810,6 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
                 pass
         return
 
-    # Handle Extract option
     if action == "extract":
         format_kbd = [
             [InlineKeyboardButton(text=make_small_caps("ᴘʏʀᴏɢʀᴀᴍ"), callback_data=f"format_sel:pyrogram:extract:{phone}:{page}")],
@@ -843,11 +819,10 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
         await callback_query.message.edit_text(
             "🗂 <b>Choose the session format for export:</b>",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=format_kbd),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
         return
 
-    # Handle Export SQLite option
     if action == "export":
         format_kbd = [
             [InlineKeyboardButton(text=make_small_caps("ᴘʏʀᴏɢʀᴀᴍ"), callback_data=f"format_sel:pyrogram:export:{phone}:{page}")],
@@ -857,11 +832,10 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
         await callback_query.message.edit_text(
             "🗂 <b>Choose the session format for export:</b>",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=format_kbd),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
         return
 
-    # Handle Security option
     if action == "security":
         p_name = acc.get("profile_name") or "ᴜɴᴋɴᴏᴡɴ"
 
@@ -886,14 +860,14 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
             f"<b>ᴀᴄᴄᴏᴜɴᴛ:</b> <code>{html.escape(phone)}</code> | <code>{html.escape(p_name)}</code>\n\n"
             "<b><b>ᴄʜᴏᴏsᴇ ᴀɴ ᴀᴄᴛɪᴏɴ ʙᴇʟᴏᴡ:</b></b>",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=sec_kbd),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
         return
 
 @router.message(SendStates.waiting_for_target)
 async def process_send_target(message: Message, state: FSMContext):
     if not message.text:
-        await message.answer("<b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ᴛᴀʀɢᴇᴛ ɪᴅ ᴏʀ ᴜsᴇʀɴᴀᴍᴇ.</b>", parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True))
+        await message.answer("<b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ᴛᴀʀɢᴇᴛ ɪᴅ ᴏʀ ᴜsᴇʀɴᴀᴍᴇ.</b>", parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True))
         return
 
     target_raw = message.text.strip()
@@ -914,14 +888,14 @@ async def process_send_target(message: Message, state: FSMContext):
         "<b><b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴛʜᴇ ᴍᴇssᴀɢᴇ ᴛᴇxᴛ</b> you want to send below:</b>\n\n"
         "ᴘʀᴇss ᴄᴀɴᴄᴇʟ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ᴀʙᴏʀᴛ.",
         reply_markup=get_back_to_panel_keyboard(phone, page),
-        parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+        parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
     )
     await state.set_state(SendStates.waiting_for_message)
 
 @router.message(SendStates.waiting_for_message)
 async def process_send_message(message: Message, state: FSMContext):
     if not message.text:
-        await message.answer("<b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ᴛᴇxᴛ ᴍᴇssᴀɢᴇ.</b>", parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True))
+        await message.answer("<b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ᴛᴇxᴛ ᴍᴇssᴀɢᴇ.</b>", parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True))
         return
 
     msg_text = message.text.strip()
@@ -934,14 +908,14 @@ async def process_send_message(message: Message, state: FSMContext):
 
     acc = await get_account(phone, user_id=message.from_user.id)
     if not acc:
-        await message.answer("<b>ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True))
+        await message.answer("<b>ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True))
         return
 
     session_str = decrypt_data(acc["encrypted_session"])
     proxy = acc.get("proxy")
     custom_api = acc.get("custom_api")
 
-    status_msg = await message.answer("⏳ <b><b>ᴄᴏɴɴᴇᴄᴛɪɴɢ ᴛᴏ ᴛᴇʟᴇɢʀᴀᴍ sᴇʀᴠᴇʀs &amp; sᴇɴᴅɪɴɢ...</b></b>", parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True))
+    status_msg = await message.answer("⏳ <b><b>ᴄᴏɴɴᴇᴄᴛɪɴɢ ᴛᴏ ᴛᴇʟᴇɢʀᴀᴍ sᴇʀᴠᴇʀs &amp; sᴇɴᴅɪɴɢ...</b></b>", parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True))
     client = create_pyrogram_client(f"snd_{phone.replace('+', '')}", session_str, proxy, custom_api)
 
     try:
@@ -955,13 +929,13 @@ async def process_send_message(message: Message, state: FSMContext):
             f"<b>ʀᴇᴄɪᴘɪᴇɴᴛ:</b> <code>{html.escape(str(target))}</code>\n"
             f"📝 <b>ᴍᴇssᴀɢᴇ:</b> <code>{html.escape(msg_text)}</code>",
             reply_markup=get_back_to_panel_keyboard(phone, page),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
     except Exception as e:
         await status_msg.edit_text(
             f"<b>ꜰᴀɪʟᴇᴅ ᴛᴏ sᴇᴛ ᴍᴇssᴀɢᴇ:</b> <code>{html.escape(str(e))}</code>",
             reply_markup=get_back_to_panel_keyboard(phone, page),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
     finally:
         try:
@@ -972,7 +946,6 @@ async def process_send_message(message: Message, state: FSMContext):
 
 @router.callback_query(F.data.startswith("sec_opt:"))
 async def process_security_options(callback_query: CallbackQuery, state: FSMContext):
-    # Instantly answer callback query to stop the button spinning circle immediately!
     await callback_query.answer()
 
     parts = callback_query.data.split(":")
@@ -990,7 +963,7 @@ async def process_security_options(callback_query: CallbackQuery, state: FSMCont
             "<i>ᴇxᴀᴍᴘʟᴇ:</i> <code>ᴍʏᴏʟᴅᴘᴀss123:ᴍʏɴᴇᴡᴘᴀss456</code>\n\n"
             "ᴘʀᴇss ᴄᴀɴᴄᴇʟ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ᴀʙᴏʀᴛ.",
             reply_markup=get_back_to_panel_keyboard(phone, page),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
         await state.set_state(SecurityStates.waiting_for_new_2fa)
         return
@@ -1002,7 +975,7 @@ async def process_security_options(callback_query: CallbackQuery, state: FSMCont
             "<b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴄʟᴏᴜᴅ ᴘᴀssᴡᴏʀᴅ ʙᴇʟᴏᴡ</b> ᴛᴏ ᴅɪsᴀʙʟᴇ 2ꜰᴀ ᴄᴏᴍᴘʟᴇᴛᴇʟʏ:\n\n"
             "ᴘʀᴇss ᴄᴀɴᴄᴇʟ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ᴀʙᴏʀᴛ.",
             reply_markup=get_back_to_panel_keyboard(phone, page),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
         await state.set_state(SecurityStates.waiting_for_remove_2fa)
         return
@@ -1010,7 +983,7 @@ async def process_security_options(callback_query: CallbackQuery, state: FSMCont
     if sec_action == "view_sessions":
         await callback_query.message.edit_text(
             f"⏳ <b>ꜰᴇᴛᴄʜɪɴɢ ᴀᴄᴛɪᴠᴇ sᴇssɪᴏɴs ꜰᴏʀ</b> <code>{html.escape(phone)}</code>... <b>ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ.</b>",
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
 
         acc = await get_account(phone, user_id=callback_query.from_user.id)
@@ -1063,13 +1036,13 @@ async def process_security_options(callback_query: CallbackQuery, state: FSMCont
             await callback_query.message.edit_text(
                 sessions_text,
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=sess_buttons),
-                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
             )
         except Exception as e:
             await callback_query.message.edit_text(
                 f"<b><b>ꜰᴀɪʟᴇᴅ ᴛᴏ ꜰᴇᴛᴄʜ sᴇssɪᴏɴs:</b></b> <code>{html.escape(str(e))}</code>",
                 reply_markup=get_back_to_panel_keyboard(phone, page),
-                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
             )
         finally:
             try:
@@ -1086,7 +1059,7 @@ async def process_security_options(callback_query: CallbackQuery, state: FSMCont
             "<b><b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴛʜᴇ ɴᴇᴡ ᴘʀᴏꜰɪʟᴇ ɴᴀᴍᴇ below:</b></b>\n\n"
             "ᴘʀᴇss ᴄᴀɴᴄᴇʟ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ᴀʙᴏʀᴛ.",
             reply_markup=get_back_to_panel_keyboard(phone, page),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
         await state.set_state(SecurityStates.waiting_for_new_name)
         return
@@ -1111,7 +1084,7 @@ async def process_revoke_session_prompt(callback_query: CallbackQuery):
         f"<b>ᴀʀᴇ ʏᴏᴜ sᴜʀᴇ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ʀᴇᴠᴏᴋᴇ ᴛʜɪs sᴇssɪᴏɴ?</b>\n\n"
         "ᴛʜɪs ᴀᴄᴛɪᴏɴ ᴡɪʟʟ ɪɴsᴛᴀɴᴛʟʏ terminate and log out the selected device.",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=confirm_kbd),
-        parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+        parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
     )
 
 @router.callback_query(F.data.startswith("confirm_rev:"))
@@ -1125,7 +1098,7 @@ async def process_confirm_revoke_session(callback_query: CallbackQuery):
 
     await callback_query.message.edit_text(
         f"⏳ <b>ʀᴇᴠᴏᴋɪɴɢ sᴇssɪᴏɴ... ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ.</b>",
-        parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+        parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
     )
 
     acc = await get_account(phone, user_id=callback_query.from_user.id)
@@ -1143,7 +1116,7 @@ async def process_confirm_revoke_session(callback_query: CallbackQuery):
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ sᴇssɪᴏɴs ʟɪsᴛ"), callback_data=f"sec_opt:view_sessions:{phone}:{page}")]
             ]),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
     except Exception as e:
         await callback_query.message.edit_text(
@@ -1151,7 +1124,7 @@ async def process_confirm_revoke_session(callback_query: CallbackQuery):
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ sᴇssɪᴏɴs ʟɪsᴛ"), callback_data=f"sec_opt:view_sessions:{phone}:{page}")]
             ]),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
     finally:
         try:
@@ -1163,7 +1136,7 @@ async def process_confirm_revoke_session(callback_query: CallbackQuery):
 @router.message(SecurityStates.waiting_for_new_name)
 async def process_new_profile_name(message: Message, state: FSMContext):
     if not message.text:
-        await message.answer("<b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ɴᴀᴍᴇ.</b>", parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True))
+        await message.answer("<b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ɴᴀᴍᴇ.</b>", parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True))
         return
 
     new_name = message.text.strip()
@@ -1175,14 +1148,14 @@ async def process_new_profile_name(message: Message, state: FSMContext):
 
     acc = await get_account(phone, user_id=message.from_user.id)
     if not acc:
-        await message.answer("<b>ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True))
+        await message.answer("<b>ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True))
         return
 
     session_str = decrypt_data(acc["encrypted_session"])
     proxy = acc.get("proxy")
     custom_api = acc.get("custom_api")
 
-    status_msg = await message.answer("⏳ <b><b><b><b>ᴄᴏɴɴᴇᴄᴛɪɴɢ ᴛᴏ ᴛᴇʟᴇɢʀᴀᴍ sᴇʀᴠᴇʀs &amp; ᴜᴘᴅᴀᴛɪɴɢ...</b></b></b></b>", parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True))
+    status_msg = await message.answer("⏳ <b><b><b><b>ᴄᴏɴɴᴇᴄᴛɪɴɢ ᴛᴏ ᴛᴇʟᴇɢʀᴀᴍ sᴇʀᴠᴇʀs &amp; ᴜᴘᴅᴀᴛɪɴɢ...</b></b></b></b>", parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True))
     client = create_pyrogram_client(f"ren_{phone.replace('+', '')}", session_str, proxy, custom_api)
 
     try:
@@ -1208,13 +1181,13 @@ async def process_new_profile_name(message: Message, state: FSMContext):
             f"<b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>\n"
             f"<b>ɴᴇᴡ ɴᴀᴍᴇ:</b> <code>{html.escape(new_name)}</code>",
             reply_markup=get_back_to_panel_keyboard(phone, page),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
     except Exception as e:
         await status_msg.edit_text(
             f"<b><b><b>ꜰᴀɪʟᴇᴅ ᴛᴏ ʀᴇɴᴀᴍᴇ ᴘʀᴏꜰɪʟᴇ:</b></b></b> <code>{html.escape(str(e))}</code>",
             reply_markup=get_back_to_panel_keyboard(phone, page),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
     finally:
         try:
@@ -1226,7 +1199,7 @@ async def process_new_profile_name(message: Message, state: FSMContext):
 @router.message(SecurityStates.waiting_for_new_2fa)
 async def process_set_2fa_text(message: Message, state: FSMContext):
     if not message.text:
-        await message.answer("<b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ᴛᴇxᴛ ᴘᴀssᴡᴏʀᴅ.</b>", parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True))
+        await message.answer("<b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ᴛᴇxᴛ ᴘᴀssᴡᴏʀᴅ.</b>", parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True))
         return
     data = await state.get_data()
     phone = data.get("phone")
@@ -1237,14 +1210,14 @@ async def process_set_2fa_text(message: Message, state: FSMContext):
 
     acc = await get_account(phone, user_id=message.from_user.id)
     if not acc:
-        await message.answer("<b>ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True))
+        await message.answer("<b>ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True))
         return
 
     session_str = decrypt_data(acc["encrypted_session"])
     proxy = acc.get("proxy")
     custom_api = acc.get("custom_api")
 
-    status_msg = await message.answer("⏳ <b><b>ᴄᴏɴɴᴇᴄᴛɪɴɢ ᴛᴏ ᴛᴇʟᴇɢʀᴀᴍ sᴇʀᴠᴇʀs...</b></b>", parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True))
+    status_msg = await message.answer("⏳ <b><b>ᴄᴏɴɴᴇᴄᴛɪɴɢ ᴛᴏ ᴛᴇʟᴇɢʀᴀᴍ sᴇʀᴠᴇʀs...</b></b>", parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True))
     client = create_pyrogram_client(f"sec_{phone.replace('+', '')}", session_str, proxy, custom_api)
 
     try:
@@ -1261,7 +1234,7 @@ async def process_set_2fa_text(message: Message, state: FSMContext):
                 f"<b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>\n"
                 f"🔒 <b><b>ɴᴇᴡ ᴘᴀssᴡᴏʀᴅ:</b></b> <code>{html.escape(new_pwd)}</code>",
                 reply_markup=get_back_to_panel_keyboard(phone, page),
-                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
             )
         else:
             new_pwd = text
@@ -1272,7 +1245,7 @@ async def process_set_2fa_text(message: Message, state: FSMContext):
                     f"<b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>\n"
                     f"🔒 <b>ᴘᴀssᴡᴏʀᴅ:</b> <code>{html.escape(new_pwd)}</code>",
                     reply_markup=get_back_to_panel_keyboard(phone, page),
-                    parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+                    parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
                 )
             except ValueError as val_err:
                 if "already" in str(val_err).lower() or "active" in str(val_err).lower():
@@ -1281,7 +1254,7 @@ async def process_set_2fa_text(message: Message, state: FSMContext):
                         "ᴘʟᴇᴀsᴇ retry by providing both the current and new password in this format:\n"
                         "<code>ᴄᴜʀʀᴇɴᴛ_ᴘᴀssᴡᴏʀᴅ:ɴᴇᴡ_ᴘᴀssᴡᴏʀᴅ</code>",
                         reply_markup=get_back_to_panel_keyboard(phone, page),
-                        parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+                        parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
                     )
                 else:
                     raise val_err
@@ -1290,7 +1263,7 @@ async def process_set_2fa_text(message: Message, state: FSMContext):
         await status_msg.edit_text(
             f"<b>ꜰᴀɪʟᴇᴅ ᴛᴏ sᴇᴛ/ᴄʜᴀɴɢᴇ 2ꜰᴀ:</b> <code>{html.escape(str(e))}</code>",
             reply_markup=get_back_to_panel_keyboard(phone, page),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
     finally:
         try:
@@ -1302,7 +1275,7 @@ async def process_set_2fa_text(message: Message, state: FSMContext):
 @router.message(SecurityStates.waiting_for_remove_2fa)
 async def process_remove_2fa_text(message: Message, state: FSMContext):
     if not message.text:
-        await message.answer("<b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ᴛᴇxᴛ ᴘᴀssᴡᴏʀᴅ.</b>", parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True))
+        await message.answer("<b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ᴛᴇxᴛ ᴘᴀssᴡᴏʀᴅ.</b>", parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True))
         return
     data = await state.get_data()
     phone = data.get("phone")
@@ -1313,14 +1286,14 @@ async def process_remove_2fa_text(message: Message, state: FSMContext):
 
     acc = await get_account(phone, user_id=message.from_user.id)
     if not acc:
-        await message.answer("<b>ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True))
+        await message.answer("<b>ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True))
         return
 
     session_str = decrypt_data(acc["encrypted_session"])
     proxy = acc.get("proxy")
     custom_api = acc.get("custom_api")
 
-    status_msg = await message.answer("⏳ <b><b>ᴄᴏɴɴᴇᴄᴛɪɴɢ ᴛᴏ ᴛᴇʟᴇɢʀᴀᴍ sᴇʀᴠᴇʀs...</b></b>", parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True))
+    status_msg = await message.answer("⏳ <b><b>ᴄᴏɴɴᴇᴄᴛɪɴɢ ᴛᴏ ᴛᴇʟᴇɢʀᴀᴍ sᴇʀᴠᴇʀs...</b></b>", parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True))
     client = create_pyrogram_client(f"sec_{phone.replace('+', '')}", session_str, proxy, custom_api)
 
     try:
@@ -1331,13 +1304,13 @@ async def process_remove_2fa_text(message: Message, state: FSMContext):
             f"<b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>\n"
             f"🔓 <b>2<b>ꜰᴀ sᴛᴀᴛᴜs:</b></b> ᴅɪsᴀʙʟᴇᴅ",
             reply_markup=get_back_to_panel_keyboard(phone, page),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
     except Exception as e:
         await status_msg.edit_text(
             f"<b>ꜰᴀɪʟᴇᴅ ᴛᴏ ʀᴇᴍᴏᴠᴇ 2ꜰᴀ:</b> <code>{html.escape(str(e))}</code>",
             reply_markup=get_back_to_panel_keyboard(phone, page),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
     finally:
         try:
@@ -1363,7 +1336,7 @@ async def bulk_export_prompt_handler(callback_query: CallbackQuery):
     await callback_query.message.edit_text(
         "🗂 <b>Choose the session format for export:</b>",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=format_kbd),
-        parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+        parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
     )
 
 @router.callback_query(F.data.startswith("format_sel_bulk:"))
@@ -1384,14 +1357,14 @@ async def process_bulk_format_selection(callback_query: CallbackQuery):
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ"), callback_data=f"back_to_list:{page}")]
             ]),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
         return
 
     if action == "text_file":
         await callback_query.message.edit_text(
             f"⏳ <b>ᴄᴏᴍᴘɪʟɪɴɢ {len(accounts)} session strings to a single text file... ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ.</b>",
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
 
         txt_path = Path("temp_bulk") / f"all_sessions_{user_id}_{os.urandom(4).hex()}.txt"
@@ -1419,14 +1392,14 @@ async def process_bulk_format_selection(callback_query: CallbackQuery):
                     chat_id=callback_query.message.chat.id,
                     document=FSInputFile(str(txt_path)),
                     caption=f"📄 <b><b>ʙᴜʟᴋ sᴇssɪᴏɴ sᴛʀɪɴɢs (.ᴛxᴛ) ᴇxᴘᴏʀᴛᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b></b>\n\n<b>ᴛᴏᴛᴀʟ ᴀᴄᴄᴏᴜɴᴛs:</b> <code>{len(accounts)}</code>",
-                    parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+                    parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
                 )
                 await callback_query.message.edit_text(
                     f"<b>session strings text file sent successfully!</b>\n\n<b>ᴛᴏᴛᴀʟ ᴀᴄᴄᴏᴜɴᴛs:</b> <code>{len(accounts)}</code>",
                     reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                         [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ"), callback_data=f"back_to_list:{page}")]
                     ]),
-                    parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+                    parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
                 )
             else:
                 raise FileNotFoundError("Text file was not successfully generated.")
@@ -1438,7 +1411,7 @@ async def process_bulk_format_selection(callback_query: CallbackQuery):
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ"), callback_data=f"back_to_list:{page}")]
                 ]),
-                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
             )
         finally:
             if txt_path.exists():
@@ -1460,7 +1433,7 @@ async def process_bulk_format_selection(callback_query: CallbackQuery):
     if action == "sqlite":
         await callback_query.message.edit_text(
             f"⏳ <b>ᴄᴏɴᴠᴇʀᴛɪɴɢ {len(accounts)} sᴇssɪᴏɴs... ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ.</b>",
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
 
         try:
@@ -1486,14 +1459,14 @@ async def process_bulk_format_selection(callback_query: CallbackQuery):
                     chat_id=callback_query.message.chat.id,
                     document=FSInputFile(str(zip_path)),
                     caption=f"📦 <b>ʙᴜʟᴋ sᴇssɪᴏɴs (.ᴢɪᴘ) ᴇxᴘᴏʀᴛᴇᴅ sᴜᴄssꜰᴜʟʟʏ!</b>\n\n<b>ᴛᴏᴛᴀʟ ᴀᴄᴄᴏᴜɴᴛs:</b> <code>{len(accounts)}</code>",
-                    parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+                    parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
                 )
                 await callback_query.message.edit_text(
                     f"<b> sᴇssɪᴏɴs ZIP file sent successfully!</b>\n\n<b>ᴛᴏᴛᴀʟ ᴀᴄᴄᴏᴜɴᴛs:</b> <code>{len(accounts)}</code>",
                     reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                         [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ"), callback_data=f"back_to_list:{page}")]
                     ]),
-                    parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+                    parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
                 )
             else:
                 raise FileNotFoundError("ZIP file was not successfully generated.")
@@ -1505,13 +1478,13 @@ async def process_bulk_format_selection(callback_query: CallbackQuery):
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ"), callback_data=f"back_to_list:{page}")]
                 ]),
-                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
             )
 
     elif action == "strings":
         await callback_query.message.edit_text(
             f"⏳ <b>ᴄᴏᴍᴘɪʟɪɴɢ {len(accounts)} session strings... ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ.</b>",
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
 
         try:
@@ -1525,8 +1498,6 @@ async def process_bulk_format_selection(callback_query: CallbackQuery):
 
                 if format_choice == "telethon":
                     generate_telethon_sqlite(session_str, name_clean, temp_dir)
-                    # For the consolidated string file, we can optionally keep the string format or skip it.
-                    # Since they want native sessions, let's just note it's converted.
                     out_str = pyrogram_to_telethon(session_str) or "Error converting"
                     consolidated_lines.append(f"{phone}: {out_str}")
                 else:
@@ -1554,14 +1525,14 @@ async def process_bulk_format_selection(callback_query: CallbackQuery):
                     chat_id=callback_query.message.chat.id,
                     document=FSInputFile(str(zip_path)),
                     caption=f"🌀 <b>ʙᴜʟᴋ sᴇssɪᴏɴ sᴛʀɪɴɢs (.ᴢɪᴘ) ɢᴇɴᴇʀᴀᴛᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b>\n\n<b>ᴛᴏᴛᴀʟ ᴀᴄᴄᴏᴜɴᴛs:</b> <code>{len(accounts)}</code>",
-                    parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+                    parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
                 )
                 await callback_query.message.edit_text(
                     f"<b>sᴇssɪᴏɴ sᴛʀɪɴɢs ZIP file sent successfully!</b>\n\n<b>ᴛᴏᴛᴀʟ ᴀᴄᴄᴏᴜɴᴛs:</b> <code>{len(accounts)}</code>",
                     reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                         [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ"), callback_data=f"back_to_list:{page}")]
                     ]),
-                    parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+                    parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
                 )
             else:
                 raise FileNotFoundError("ZIP file was not successfully generated.")
@@ -1573,7 +1544,7 @@ async def process_bulk_format_selection(callback_query: CallbackQuery):
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ"), callback_data=f"back_to_list:{page}")]
                 ]),
-                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+                parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
             )
 
     # Clean up temp directories
@@ -1605,7 +1576,7 @@ async def bulk_export_handler(callback_query: CallbackQuery):
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ"), callback_data=f"back_to_list:{page}")]
             ]),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
         return
 
@@ -1620,7 +1591,7 @@ async def bulk_export_handler(callback_query: CallbackQuery):
             "📦 <b>ʙᴜʟᴋ ᴇxᴘᴏʀᴛ / ɢᴇɴᴇʀᴀᴛᴇ</b>\n\n"
             "ᴄʜᴏᴏsᴇ:",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=export_keyboard),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
         return
 
@@ -1639,7 +1610,7 @@ async def process_confirm_deletion(callback_query: CallbackQuery):
     if deleted:
         await callback_query.message.edit_text(
             f"<b>sᴜᴄᴄᴇssꜰᴜʟʟʏ ᴅᴇʟᴇᴛᴇᴅ ᴀᴄᴄᴏᴜɴᴛ:</b> <code>{html.escape(phone)}</code>",
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True),
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True),
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ"), callback_data=f"back_to_list:{page}")]
             ])
@@ -1647,7 +1618,7 @@ async def process_confirm_deletion(callback_query: CallbackQuery):
     else:
         await callback_query.message.edit_text(
             f"<b><b>ꜰᴀɪʟᴇᴅ ᴏʀ ᴀʟʀᴇᴀᴅʏ ᴅᴇʟᴇᴛᴇᴅ ᴀᴄᴄᴏᴜɴᴛ</b></b> <code>{html.escape(phone)}</code>.",
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True),
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True),
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ"), callback_data=f"back_to_list:{page}")]
             ])
@@ -1661,7 +1632,7 @@ async def process_search_acc(callback_query: CallbackQuery, state: FSMContext):
         await callback_query.message.edit_text(
             f"<b>{text}</b>",
             reply_markup=get_back_keyboard(),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True),
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True),
 
         )
     except Exception:
@@ -1669,7 +1640,7 @@ async def process_search_acc(callback_query: CallbackQuery, state: FSMContext):
         await callback_query.message.answer(
             f"<b>{text}</b>",
             reply_markup=get_back_keyboard(),
-            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True),
+            parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True),
 
         )
     await state.set_state(SearchAccounts.waiting_for_query)
@@ -1695,7 +1666,6 @@ async def process_search_query(message: Message, state: FSMContext):
 
     await message.answer(
         f"<b>{text}</b>",
-        parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True),
+        parse_mode="HTML", link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True),
         reply_markup=get_accounts_keyboard(filtered_accounts, page=0),
-
     )
