@@ -48,12 +48,40 @@ from pyrogram.errors import (
 
 logger = logging.getLogger("TGStorageBot.plugins.list_accounts")
 
+import random
+from aiogram.types import InputMediaPhoto
+
+IMAGES = [
+    'https://graph.org/file/e8af951d867b0aaff8cb0-3205689663c5c662ba.jpg', 'https://graph.org/file/9ce76c7db28dc4daa5f27-b969a50f5a53345633.jpg',
+    'https://graph.org/file/3207c5504dc9d45f5d9cf-a8e081cb548479752f.jpg', 'https://graph.org/file/c31949e692d280663d58b-175b7206869b9a2c82.jpg',
+    'https://graph.org/file/800c9a3ee9ebc2097d38f-7609d3cf5ae42e41d5.jpg', 'https://graph.org/file/6e6502b5c2d6a68cac1c4-45a1ffc966477471c7.jpg',
+    'https://graph.org/file/826a285bb1b76717d6a0e-0a8d4d501cf45fc2db.jpg', 'https://graph.org/file/0a315ee59fbc73bc44326-a766d350855ca79eca.jpg',
+    'https://graph.org/file/ac509cacdbc03efbc2e8d-a8ac806b49a71e872d.jpg', 'https://graph.org/file/dd250b63501917843e481-3675d23c4799f97624.jpg',
+    'https://graph.org/file/161d918adb1682dd7e301-32d10ea7256daacfa4.jpg', 'https://graph.org/file/7626817e26de338d2e5a1-478b1b721ca9bc63d3.jpg',
+    'https://graph.org/file/dd250b63501917843e481-3675d23c4799f97624.jpg', 'https://graph.org/file/9c52583fba67124b6a183-586e58ffeeb840bc5e.jpg',
+    'https://graph.org/file/91621631e7dc800ea4562-4b0a9c3601a270556d.jpg', 'https://graph.org/file/91621631e7dc800ea4562-4b0a9c3601a270556d.jpg',
+    'https://graph.org/file/4abf7c572c4949e7f657e-3fbcdfd9fc67de5845.jpg', 'https://graph.org/file/89cddd266235b8a806f0e-6504ecc249b2e58ee7.jpg',
+    'https://graph.org/file/eace0fc6fa82c0ca3521a-a089e3306f6386977d.jpg', 'https://graph.org/file/a50cde78b6d61ebb76ccd-9d02a956a89fddadd8.jpg',
+    'https://graph.org/file/c77152bc70b96db0f079f-0cca0a31c983f97478.jpg', 'https://graph.org/file/019f4539cbecec208972c-c65454256e966a830c.jpg',
+    'https://graph.org/file/d7f8b0cf7cf78723b3aee-a5b041281c203e2449.jpg', 'https://graph.org/file/8a012335580d322e7438f-353fbd48e95b00f0f7.jpg',
+    'https://graph.org/file/c698be54a12027fb82e69-e9feef426481186208.jpg', 'https://graph.org/file/e3c28bdeb0c2af1b3bbb9-0c5a132aca7f768332.jpg',
+    'https://graph.org/file/d8b92bfb4b8932e2ae553-ff9264f5b40c710698.jpg', 'https://graph.org/file/deff1d9b2af3c0740b525-9032f27f051633a627.jpg',
+    'https://graph.org/file/a668600b4a516645369fa-465839cfd9e31ecf85.jpg', 'https://graph.org/file/f11e43b3ba09ff1af2eeb-a7d7c86298644597f3.jpg',
+    'https://graph.org/file/13b0eaf75f4ffd28cd445-6e5b90592458fc05f1.jpg'
+]
+
+
+
 router = Router()
 
 class SecurityStates(StatesGroup):
     waiting_for_new_2fa = State()
     waiting_for_remove_2fa = State()
     waiting_for_new_name = State()
+
+
+class SearchAccounts(StatesGroup):
+    waiting_for_query = State()
 
 class SendStates(StatesGroup):
     waiting_for_target = State()
@@ -139,41 +167,49 @@ def estimate_account_age(user_id: int) -> tuple[str, str]:
 
 def get_back_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ᴍᴀɪɴ ᴍᴇɴᴜ", callback_data="menu:main")]
+        [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ ᴍᴀɪɴ ᴍᴇɴᴜ"), callback_data="menu:main")]
     ])
 
 def get_back_to_panel_keyboard(phone: str, page: int = 0) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ᴘᴀɴᴇʟ", callback_data=f"view_acc:{phone}:{page}")]
+        [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ ᴘᴀɴᴇʟ"), callback_data=f"view_acc:{phone}:{page}")]
     ])
 
 def get_accounts_keyboard(accounts: list, page: int = 0) -> InlineKeyboardMarkup:
     keyboard = []
 
-    start_idx = page * 6
-    end_idx = start_idx + 6
+    # Max 24 accounts per page, 3 per row
+    start_idx = page * 24
+    end_idx = start_idx + 24
     page_accounts = accounts[start_idx:end_idx]
 
+    # Create 8x3 grid
+    row = []
     for acc in page_accounts:
         phone = acc.get("phone")
-        p_name = acc.get("profile_name") or "ᴜɴᴋɴᴏᴡɴ"
-        btn_text = f"📱 {phone} | ⚙️ {p_name}"
-        keyboard.append([InlineKeyboardButton(text=btn_text, callback_data=f"view_acc:{phone}:{page}")])
+        p_name = make_small_caps(acc.get("profile_name", "unknown") or "unknown")
+        # Ensure btn_text length is manageable and strictly small caps with no emojis
+        btn_text = make_small_caps(f"{phone[:6]} | {p_name[:8]}")
+        row.append(InlineKeyboardButton(text=btn_text, callback_data=f"view_acc:{phone}:{page}"))
+        if len(row) == 3:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
 
-    # Navigation row (only if total accounts > 6)
+    # Navigation row (only if total accounts > 24)
     nav_row = []
     if page > 0:
-        nav_row.append(InlineKeyboardButton(text="ᴘʀᴇᴠ", callback_data=f"list_page:{page - 1}"))
+        nav_row.append(InlineKeyboardButton(text=make_small_caps("previous"), callback_data=f"list_page:{page - 1}"))
     if end_idx < len(accounts):
-        nav_row.append(InlineKeyboardButton(text="ɴᴇxᴛ", callback_data=f"list_page:{page + 1}"))
+        nav_row.append(InlineKeyboardButton(text=make_small_caps("next"), callback_data=f"list_page:{page + 1}"))
 
     if nav_row:
         keyboard.append(nav_row)
 
-    # Add Bulk Export button inside accounts list, above back to main menu
-    keyboard.append([InlineKeyboardButton(text="ʙᴜʟᴋ ᴇxᴘᴏʀᴛ / ɢᴇɴᴇʀᴀᴛᴇ", callback_data=f"bulk_export:menu:{page}")])
-
-    keyboard.append([InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ᴍᴀɪɴ ᴍᴇɴᴜ", callback_data="menu:main")])
+    keyboard.append([InlineKeyboardButton(text=make_small_caps("search account"), callback_data="search_acc")])
+    keyboard.append([InlineKeyboardButton(text=make_small_caps("bulk export"), callback_data=f"bulk_export:menu:{page}")])
+    keyboard.append([InlineKeyboardButton(text=make_small_caps("back"), callback_data="menu:main")])
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 async def save_session_string_to_file(session_string: str, name: str, workdir: Path) -> Path:
@@ -216,7 +252,7 @@ async def check_otp_logic(callback_query: CallbackQuery, phone: str, page: int):
 
     acc = await get_account(phone, user_id=callback_query.from_user.id)
     if not acc:
-        await callback_query.message.edit_text("❌ <b>sᴇʟᴇᴄᴛᴇᴅ ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML")
+        await callback_query.message.edit_text("<b>sᴇʟᴇᴄᴛᴇᴅ ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML")
         return
 
     session_str = decrypt_data(acc["encrypted_session"])
@@ -240,7 +276,7 @@ async def check_otp_logic(callback_query: CallbackQuery, phone: str, page: int):
                     try:
                         await callback_query.bot.answer_callback_query(
                             callback_query_id=callback_query.id,
-                            text=f"🔑 ʏᴏᴜʀ ᴏᴛᴘ ᴄᴏᴅᴇ: {otp_code}",
+                            text=f"ʏᴏᴜʀ ᴏᴛᴘ ᴄᴏᴅᴇ: {otp_code}",
                             show_alert=True
                         )
                     except Exception as answer_err:
@@ -248,17 +284,17 @@ async def check_otp_logic(callback_query: CallbackQuery, phone: str, page: int):
 
                     success_text = (
                         "━━━━━━━━━━━━━━━━━━━━━\n"
-                        "🔑 <b>ᴛᴇʟᴇɢʀᴀᴍ ʟᴏɢɪɴ ᴏᴛᴘ ʀᴇᴄᴇɪᴠᴇᴅ!</b>\n"
+                        "<b>ᴛᴇʟᴇɢʀᴀᴍ ʟᴏɢɪɴ ᴏᴛᴘ ʀᴇᴄᴇɪᴠᴇᴅ!</b>\n"
                         "━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"📱 <b>ᴀᴄᴄᴏᴜɴᴛ:</b> <code>{html.escape(phone)}</code>\n"
-                        f"🔑 <b>ʟᴏɢɪɴ ᴄᴏᴅᴇ:</b> <code>{otp_code}</code>\n\n"
+                        f"<b>ᴀᴄᴄᴏᴜɴᴛ:</b> <code>{html.escape(phone)}</code>\n"
+                        f"<b>ʟᴏɢɪɴ ᴄᴏᴅᴇ:</b> <code>{otp_code}</code>\n\n"
                         f"📝 <b>ᴍᴇssᴀɢᴇ ᴅᴇᴛᴀɪʟs:</b>\n<code>{escaped_text}</code>"
                     )
 
                     refresh_kbd = [
                         [
-                            InlineKeyboardButton(text="🔄 ᴄʜᴇᴄᴋ ᴀɢᴀɪɴ / ʀᴇꜰʀᴇsʜ", callback_data=f"check_otp:{phone}:{page}"),
-                            InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ᴘᴀɴᴇʟ", callback_data=f"view_acc:{phone}:{page}")
+                            InlineKeyboardButton(text=make_small_caps("ᴄʜᴇᴄᴋ ᴀɢᴀɪɴ / ʀᴇꜰʀᴇsʜ"), callback_data=f"check_otp:{phone}:{page}"),
+                            InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ ᴘᴀɴᴇʟ"), callback_data=f"view_acc:{phone}:{page}")
                         ]
                     ]
 
@@ -275,7 +311,7 @@ async def check_otp_logic(callback_query: CallbackQuery, phone: str, page: int):
             try:
                 await callback_query.bot.answer_callback_query(
                     callback_query_id=callback_query.id,
-                    text="❌ ɴᴏ ʀᴇᴄᴇɴᴛ ᴏᴛᴘ ᴄᴏᴅᴇ ꜰᴏᴜɴᴅ ɪɴ ʏᴏᴜʀ ɪɴʙᴏx.",
+                    text="ɴᴏ ʀᴇᴄᴇɴᴛ ᴏᴛᴘ ᴄᴏᴅᴇ ꜰᴏᴜɴᴅ ɪɴ ʏᴏᴜʀ ɪɴʙᴏx.",
                     show_alert=True
                 )
             except Exception as answer_err:
@@ -283,16 +319,16 @@ async def check_otp_logic(callback_query: CallbackQuery, phone: str, page: int):
 
             fail_text = (
                 "━━━━━━━━━━━━━━━━━━━━━\n"
-                "⚠️ <b><b>ɴᴏ ʀᴇᴄᴇɴᴛ ᴏᴛᴘ ᴄᴏᴅᴇ ꜰᴏᴜɴᴅ!</b></b>\n"
+                "<b><b>ɴᴏ ʀᴇᴄᴇɴᴛ ᴏᴛᴘ ᴄᴏᴅᴇ ꜰᴏᴜɴᴅ!</b></b>\n"
                 "━━━━━━━━━━━━━━━━━━━━━\n"
-                f"📱 <b>ᴀᴄᴄᴏᴜɴᴛ:</b> <code>{html.escape(phone)}</code>\n\n"
-                "👉 ᴘʟᴇᴀsᴇ ᴍᴀᴋᴇ sᴜʀᴇ ʏᴏᴜ ᴛʀɪɢɢᴇʀᴇᴅ ᴛʜᴇ ʟᴏɢɪɴ ᴄᴏᴅᴇ ʀᴇǫᴜᴇsᴛ on your official Telegram App or device first, then click the refresh button below to scan again!"
+                f"<b>ᴀᴄᴄᴏᴜɴᴛ:</b> <code>{html.escape(phone)}</code>\n\n"
+                "ᴘʟᴇᴀsᴇ ᴍᴀᴋᴇ sᴜʀᴇ ʏᴏᴜ ᴛʀɪɢɢᴇʀᴇᴅ ᴛʜᴇ ʟᴏɢɪɴ ᴄᴏᴅᴇ ʀᴇǫᴜᴇsᴛ on your official Telegram App or device first, then click the refresh button below to scan again!"
             )
 
             refresh_kbd = [
                 [
-                    InlineKeyboardButton(text="🔄 ᴄʜᴇᴄᴋ ᴀɢᴀɪɴ / ʀᴇꜰʀᴇsʜ", callback_data=f"check_otp:{phone}:{page}"),
-                    InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ᴘᴀɴᴇʟ", callback_data=f"view_acc:{phone}:{page}")
+                    InlineKeyboardButton(text=make_small_caps("ᴄʜᴇᴄᴋ ᴀɢᴀɪɴ / ʀᴇꜰʀᴇsʜ"), callback_data=f"check_otp:{phone}:{page}"),
+                    InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ ᴘᴀɴᴇʟ"), callback_data=f"view_acc:{phone}:{page}")
                 ]
             ]
 
@@ -304,7 +340,7 @@ async def check_otp_logic(callback_query: CallbackQuery, phone: str, page: int):
 
     except Exception as e:
         await callback_query.message.edit_text(
-            f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ sᴄᴀɴ ɪɴʙᴏx:</b> <code>{html.escape(str(e))}</code>",
+            f"<b>ꜰᴀɪʟᴇᴅ ᴛᴏ sᴄᴀɴ ɪɴʙᴏx:</b> <code>{html.escape(str(e))}</code>",
             reply_markup=get_back_to_panel_keyboard(phone, page),
             parse_mode="HTML"
         )
@@ -320,19 +356,40 @@ async def list_accounts_callback(callback_query: CallbackQuery, state: FSMContex
     await callback_query.answer()
     await state.clear()
     accounts = await get_all_accounts(user_id=callback_query.from_user.id)
+
     if not accounts:
-        await callback_query.message.edit_text(
-            "📭 <b><b>ɴᴏ sᴀᴠᴇᴅ ᴛᴇʟᴇɢʀᴀᴍ ᴀᴄᴄᴏᴜɴᴛs ꜰᴏᴜɴᴅ ɪɴ ᴛʜᴇ ᴅᴀᴛᴀʙᴀsᴇ.</b></b>",
-            reply_markup=get_back_keyboard(),
-            parse_mode="HTML"
-        )
+        text = "ɴᴏ sᴀᴠᴇᴅ ᴛᴇʟᴇɢʀᴀᴍ ᴀᴄᴄᴏᴜɴᴛs ꜰᴏᴜɴᴅ ɪɴ ᴛʜᴇ ᴅᴀᴛᴀʙᴀsᴇ."
+        if callback_query.message.photo:
+            await callback_query.message.edit_media(
+                media=InputMediaPhoto(media=random.choice(IMAGES), caption=f"<b>{text}</b>", parse_mode="HTML", has_spoiler=True),
+                reply_markup=get_back_keyboard()
+            )
+        else:
+            await callback_query.message.delete()
+            await callback_query.message.answer_photo(
+                photo=random.choice(IMAGES),
+                caption=f"<b>{text}</b>",
+                parse_mode="HTML",
+                reply_markup=get_back_keyboard(),
+                has_spoiler=True
+            )
         return
 
-    await callback_query.message.edit_text(
-        "📋 <b>sᴇʟᴇᴄᴛ ᴀɴ ᴀᴄᴄᴏᴜɴᴛ ꜰʀᴏᴍ ᴛʜᴇ ʟɪsᴛ:</b>",
-        reply_markup=get_accounts_keyboard(accounts, page=0),
-        parse_mode="HTML"
-    )
+    text = "sᴇʟᴇᴄᴛ ᴀɴ ᴀᴄᴄᴏᴜɴᴛ ꜰʀᴏᴍ ᴛʜᴇ ʟɪsᴛ:"
+    if callback_query.message.photo:
+        await callback_query.message.edit_media(
+            media=InputMediaPhoto(media=random.choice(IMAGES), caption=f"<b>{text}</b>", parse_mode="HTML", has_spoiler=True),
+            reply_markup=get_accounts_keyboard(accounts, page=0)
+        )
+    else:
+        await callback_query.message.delete()
+        await callback_query.message.answer_photo(
+            photo=random.choice(IMAGES),
+            caption=f"<b>{text}</b>",
+            parse_mode="HTML",
+            reply_markup=get_accounts_keyboard(accounts, page=0),
+            has_spoiler=True
+        )
 
 @router.callback_query(F.data.startswith("list_page:"))
 async def process_list_pagination(callback_query: CallbackQuery):
@@ -341,18 +398,20 @@ async def process_list_pagination(callback_query: CallbackQuery):
 
     accounts = await get_all_accounts(user_id=callback_query.from_user.id)
     if not accounts:
-        await callback_query.message.edit_text(
-            "📭 <b><b>ɴᴏ sᴀᴠᴇᴅ ᴛᴇʟᴇɢʀᴀᴍ ᴀᴄᴄᴏᴜɴᴛs ꜰᴏᴜɴᴅ ɪɴ ᴛʜᴇ ᴅᴀᴛᴀʙᴀsᴇ.</b></b>",
-            reply_markup=get_back_keyboard(),
-            parse_mode="HTML"
-        )
         return
 
-    await callback_query.message.edit_text(
-        "📋 <b>sᴇʟᴇᴄᴛ ᴀɴ ᴀᴄᴄᴏᴜɴᴛ ꜰʀᴏᴍ ᴛʜᴇ ʟɪsᴛ:</b>",
-        reply_markup=get_accounts_keyboard(accounts, page=page),
-        parse_mode="HTML"
-    )
+    text = "sᴇʟᴇᴄᴛ ᴀɴ ᴀᴄᴄᴏᴜɴᴛ ꜰʀᴏᴍ ᴛʜᴇ ʟɪsᴛ:"
+    if callback_query.message.photo:
+        await callback_query.message.edit_media(
+            media=InputMediaPhoto(media=random.choice(IMAGES), caption=f"<b>{text}</b>", parse_mode="HTML", has_spoiler=True),
+            reply_markup=get_accounts_keyboard(accounts, page=page)
+        )
+    else:
+        await callback_query.message.edit_text(
+            f"<b>{text}</b>",
+            reply_markup=get_accounts_keyboard(accounts, page=page),
+            parse_mode="HTML"
+        )
 
 @router.callback_query(F.data.startswith("back_to_list:"))
 async def process_back_to_list(callback_query: CallbackQuery):
@@ -362,14 +421,14 @@ async def process_back_to_list(callback_query: CallbackQuery):
     accounts = await get_all_accounts(user_id=callback_query.from_user.id)
     if not accounts:
         await callback_query.message.edit_text(
-            "📭 <b><b>ɴᴏ sᴀᴠᴇᴅ ᴛᴇʟᴇɢʀᴀᴍ ᴀᴄᴄᴏᴜɴᴛs ꜰᴏᴜɴᴅ ɪɴ ᴛʜᴇ ᴅᴀᴛᴀʙᴀsᴇ.</b></b>",
+            "<b><b>ɴᴏ sᴀᴠᴇᴅ ᴛᴇʟᴇɢʀᴀᴍ ᴀᴄᴄᴏᴜɴᴛs ꜰᴏᴜɴᴅ ɪɴ ᴛʜᴇ ᴅᴀᴛᴀʙᴀsᴇ.</b></b>",
             reply_markup=get_back_keyboard(),
             parse_mode="HTML"
         )
         return
 
     await callback_query.message.edit_text(
-        "📋 <b>sᴇʟᴇᴄᴛ ᴀɴ ᴀᴄᴄᴏᴜɴᴛ ꜰʀᴏᴍ ᴛʜᴇ ʟɪsᴛ:</b>",
+        "<b>sᴇʟᴇᴄᴛ ᴀɴ ᴀᴄᴄᴏᴜɴᴛ ꜰʀᴏᴍ ᴛʜᴇ ʟɪsᴛ:</b>",
         reply_markup=get_accounts_keyboard(accounts, page=page),
         parse_mode="HTML"
     )
@@ -386,11 +445,11 @@ async def list_accounts_handler(message: Message, state: FSMContext):
     await state.clear()
     accounts = await get_all_accounts(user_id=message.from_user.id)
     if not accounts:
-        await message.answer("📭 <b>ɴᴏ sᴀᴠᴇᴅ ᴛᴇʟᴇɢʀᴀᴍ ᴀᴄᴄᴏᴜɴᴛs ꜰᴏᴜɴᴅ ɪɴ ᴛʜᴇ ᴅᴀᴛᴀʙᴀsᴇ.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML")
+        await message.answer("<b>ɴᴏ sᴀᴠᴇᴅ ᴛᴇʟᴇɢʀᴀᴍ ᴀᴄᴄᴏᴜɴᴛs ꜰᴏᴜɴᴅ ɪɴ ᴛʜᴇ ᴅᴀᴛᴀʙᴀsᴇ.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML")
         return
 
     await message.answer(
-        "📋 <b>sᴇʟᴇᴄᴛ ᴀɴ ᴀᴄᴄᴏᴜɴᴛ ꜰʀᴏᴍ ᴛʜᴇ ʟɪsᴛ:</b>",
+        "<b>sᴇʟᴇᴄᴛ ᴀɴ ᴀᴄᴄᴏᴜɴᴛ ꜰʀᴏᴍ ᴛʜᴇ ʟɪsᴛ:</b>",
         reply_markup=get_accounts_keyboard(accounts, page=0),
         parse_mode="HTML"
     )
@@ -406,52 +465,52 @@ async def view_account_panel(callback_query: CallbackQuery, state: FSMContext):
 
     acc = await get_account(phone, user_id=callback_query.from_user.id)
     if not acc:
-        await callback_query.message.edit_text("❌ <b>sᴇʟᴇᴄᴛᴇᴅ ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML")
+        await callback_query.message.edit_text("<b>sᴇʟᴇᴄᴛᴇᴅ ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML")
         return
 
     p_name = acc.get("profile_name") or "ᴜɴᴋɴᴏᴡɴ"
 
     panel_keyboard = [
         [
-            InlineKeyboardButton(text="ᴅᴇᴛᴀɪʟs", callback_data=f"acc_opt:details:{phone}:{page}"),
-            InlineKeyboardButton(text="ᴠᴇʀɪꜰʏ", callback_data=f"acc_opt:verify:{phone}:{page}")
+            InlineKeyboardButton(text=make_small_caps("ᴅᴇᴛᴀɪʟs"), callback_data=f"acc_opt:details:{phone}:{page}"),
+            InlineKeyboardButton(text=make_small_caps("ᴠᴇʀɪꜰʏ"), callback_data=f"acc_opt:verify:{phone}:{page}")
         ],
         [
-            InlineKeyboardButton(text="sᴇɴᴅ", callback_data=f"acc_opt:send:{phone}:{page}"),
-            InlineKeyboardButton(text="ᴏᴛᴘ ᴄᴏᴅᴇs", callback_data=f"acc_opt:otp:{phone}:{page}")
+            InlineKeyboardButton(text=make_small_caps("sᴇɴᴅ"), callback_data=f"acc_opt:send:{phone}:{page}"),
+            InlineKeyboardButton(text=make_small_caps("ᴏᴛᴘ ᴄᴏᴅᴇs"), callback_data=f"acc_opt:otp:{phone}:{page}")
         ],
         [
-            InlineKeyboardButton(text="ᴇxᴛʀᴀᴄᴛ", callback_data=f"acc_opt:extract:{phone}:{page}"),
-            InlineKeyboardButton(text="ᴇxᴘᴏʀᴛ sǫʟɪᴛᴇ", callback_data=f"acc_opt:export:{phone}:{page}")
+            InlineKeyboardButton(text=make_small_caps("ᴇxᴛʀᴀᴄᴛ"), callback_data=f"acc_opt:extract:{phone}:{page}"),
+            InlineKeyboardButton(text=make_small_caps("ᴇxᴘᴏʀᴛ sǫʟɪᴛᴇ"), callback_data=f"acc_opt:export:{phone}:{page}")
         ],
         [
-            InlineKeyboardButton(text="sᴇᴄᴜʀɪᴛʏ", callback_data=f"acc_opt:security:{phone}:{page}")
+            InlineKeyboardButton(text=make_small_caps("sᴇᴄᴜʀɪᴛʏ"), callback_data=f"acc_opt:security:{phone}:{page}")
         ],
         [
-            InlineKeyboardButton(text="ᴅᴇʟᴇᴛᴇ", callback_data=f"acc_opt:delete:{phone}:{page}")
+            InlineKeyboardButton(text=make_small_caps("ᴅᴇʟᴇᴛᴇ"), callback_data=f"acc_opt:delete:{phone}:{page}")
         ],
         [
-            InlineKeyboardButton(text="ᴘᴜʙʟɪᴄ ᴄʜᴀɴɴᴇʟs", callback_data=f"chat_mgr:pub_chan:{phone}:{page}"),
-            InlineKeyboardButton(text="ᴘʀɪᴠᴀᴛᴇ ᴄʜᴀɴɴᴇʟs", callback_data=f"chat_mgr:priv_chan:{phone}:{page}")
+            InlineKeyboardButton(text=make_small_caps("ᴘᴜʙʟɪᴄ ᴄʜᴀɴɴᴇʟs"), callback_data=f"chat_mgr:pub_chan:{phone}:{page}"),
+            InlineKeyboardButton(text=make_small_caps("ᴘʀɪᴠᴀᴛᴇ ᴄʜᴀɴɴᴇʟs"), callback_data=f"chat_mgr:priv_chan:{phone}:{page}")
         ],
         [
-            InlineKeyboardButton(text="ɢʀᴏᴜᴘs", callback_data=f"chat_mgr:groups:{phone}:{page}"),
-            InlineKeyboardButton(text="ᴄʀᴇᴀᴛᴇ ᴄʜᴀɴɴᴇʟ", callback_data=f"chat_mgr:create_chan:{phone}:{page}")
+            InlineKeyboardButton(text=make_small_caps("ɢʀᴏᴜᴘs"), callback_data=f"chat_mgr:groups:{phone}:{page}"),
+            InlineKeyboardButton(text=make_small_caps("ᴄʀᴇᴀᴛᴇ ᴄʜᴀɴɴᴇʟ"), callback_data=f"chat_mgr:create_chan:{phone}:{page}")
         ],
         [
-            InlineKeyboardButton(text="ᴄʜᴀᴛ sᴛᴀᴛs", callback_data=f"chat_mgr:chat_stats:{phone}:{page}"),
-            InlineKeyboardButton(text="ᴀᴄᴛɪᴠᴇ ᴅᴇᴠɪᴄᴇs", callback_data=f"chat_mgr:devices:{phone}:{page}")
+            InlineKeyboardButton(text=make_small_caps("ᴄʜᴀᴛ sᴛᴀᴛs"), callback_data=f"chat_mgr:chat_stats:{phone}:{page}"),
+            InlineKeyboardButton(text=make_small_caps("ᴀᴄᴛɪᴠᴇ ᴅᴇᴠɪᴄᴇs"), callback_data=f"chat_mgr:devices:{phone}:{page}")
         ],
         [
-            InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")
+            InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ"), callback_data=f"back_to_list:{page}")
         ]
     ]
 
     panel_text = (
         "━━━━━━━━━━━━━━━━━━━━━\n"
-        "📱 <b>ᴀᴄᴄᴏᴜɴᴛ ᴘᴀɴᴇʟ</b>\n"
+        "<b>ᴀᴄᴄᴏᴜɴᴛ ᴘᴀɴᴇʟ</b>\n"
         "━━━━━━━━━━━━━━━━━━━━━\n"
-        f"📞 <code>{html.escape(phone)}</code> | ⚙️ <code>{html.escape(p_name)}</code>\n\n"
+        f"📞 <code>{html.escape(phone)}</code> |<code>{html.escape(p_name)}</code>\n\n"
         "✨ <b>ᴍᴀɴᴀɢᴇ ᴛʜɪs sᴇssɪᴏɴ ᴜsɪɴɢ ᴛʜᴇ ᴄᴏɴᴛʀᴏʟs ʙᴇʟᴏᴡ:</b>"
     )
 
@@ -476,7 +535,7 @@ async def process_format_selection(callback_query: CallbackQuery):
 
     acc = await get_account(phone, user_id=callback_query.from_user.id)
     if not acc:
-        await callback_query.message.edit_text("❌ <b>ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML")
+        await callback_query.message.edit_text("<b>ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML")
         return
 
     session_str = decrypt_data(acc["encrypted_session"])
@@ -494,10 +553,10 @@ async def process_format_selection(callback_query: CallbackQuery):
 
         extract_text = (
             "━━━━━━━━━━━━━━━━━━━━━\n"
-            "🔑 <b>sᴇssɪᴏɴ ᴇxᴛʀᴀᴄᴛɪᴏɴ</b>\n"
+            "<b>sᴇssɪᴏɴ ᴇxᴛʀᴀᴄᴛɪᴏɴ</b>\n"
             "━━━━━━━━━━━━━━━━━━━━━\n"
-            f"📱 <b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>\n"
-            f"👤 <b>ᴀᴄᴄᴏᴜɴᴛ:</b> <code>{html.escape(p_name)}</code>\n\n"
+            f"<b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>\n"
+            f"<b>ᴀᴄᴄᴏᴜɴᴛ:</b> <code>{html.escape(p_name)}</code>\n\n"
             f"👇 <b><b>{title}</b></b>\n"
             f"<code>{html.escape(out_str)}</code>"
         )
@@ -532,23 +591,23 @@ async def process_format_selection(callback_query: CallbackQuery):
                 await bot.send_document(
                     chat_id=callback_query.message.chat.id,
                     document=FSInputFile(str(file_path)),
-                    caption=f"✅ <b>sᴇssɪᴏɴ ᴇxᴘᴏʀᴛᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b>\n\n📱 <b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>",
+                    caption=f"<b>sᴇssɪᴏɴ ᴇxᴘᴏʀᴛᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b>\n\n<b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>",
                     parse_mode="HTML"
                 )
                 await callback_query.message.edit_text(
-                    f"✅ <b>sᴇssɪᴏɴ ꜰɪʟᴇ sᴇɴᴛ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b>\n\n📱 <b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>",
+                    f"<b>sᴇssɪᴏɴ ꜰɪʟᴇ sᴇɴᴛ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b>\n\n<b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>",
                     reply_markup=get_back_to_panel_keyboard(phone, page),
                     parse_mode="HTML"
                 )
             else:
                 await callback_query.message.edit_text(
-                    f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ᴇxᴘᴏʀᴛ sᴇssɪᴏɴ:</b> file was not created.",
+                    f"<b>ꜰᴀɪʟᴇᴅ ᴛᴏ ᴇxᴘᴏʀᴛ sᴇssɪᴏɴ:</b> file was not created.",
                     reply_markup=get_back_to_panel_keyboard(phone, page),
                     parse_mode="HTML"
                 )
         except Exception as e:
             await callback_query.message.edit_text(
-                f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ᴇxᴘᴏʀᴛ sᴇssɪᴏɴ:</b> <code>{html.escape(str(e))}</code>",
+                f"<b>ꜰᴀɪʟᴇᴅ ᴛᴏ ᴇxᴘᴏʀᴛ sᴇssɪᴏɴ:</b> <code>{html.escape(str(e))}</code>",
                 reply_markup=get_back_to_panel_keyboard(phone, page),
                 parse_mode="HTML"
             )
@@ -573,19 +632,19 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
 
     acc = await get_account(phone, user_id=callback_query.from_user.id)
     if not acc:
-        await callback_query.message.edit_text("❌ <b>ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML")
+        await callback_query.message.edit_text("<b>ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML")
         return
 
     # Handle delete option
     if action == "delete":
         confirm_kbd = [
             [
-                InlineKeyboardButton(text="ʏᴇs, ᴅᴇʟᴇᴛᴇ", callback_data=f"confirm_del:{phone}:{page}"),
-                InlineKeyboardButton(text="ɴᴏ, ᴄᴀɴᴄᴇʟ", callback_data=f"view_acc:{phone}:{page}")
+                InlineKeyboardButton(text=make_small_caps("ʏᴇs, ᴅᴇʟᴇᴛᴇ"), callback_data=f"confirm_del:{phone}:{page}"),
+                InlineKeyboardButton(text=make_small_caps("ɴᴏ, ᴄᴀɴᴄᴇʟ"), callback_data=f"view_acc:{phone}:{page}")
             ]
         ]
         await callback_query.message.edit_text(
-            f"⚠️ <b>ᴀʀᴇ ʏᴏᴜ sᴜʀᴇ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴅᴇʟᴇᴛᴇ <code>{html.escape(phone)}</code>?</b>\n\n"
+            f"<b>ᴀʀᴇ ʏᴏᴜ sᴜʀᴇ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴅᴇʟᴇᴛᴇ <code>{html.escape(phone)}</code>?</b>\n\n"
             "ᴛʜɪs ᴀᴄᴛɪᴏɴ ɪs ɪʀʀᴇᴠᴇʀsɪʙʟᴇ ᴀɴᴅ ᴛʜᴇ sᴇssɪᴏɴ sᴛʀɪɴɢ ᴡɪʟʟ ʙᴇ ᴘᴇʀᴍᴀɴᴇɴᴛʟʏ ᴡɪᴘᴇᴅ.",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=confirm_kbd),
             parse_mode="HTML"
@@ -601,9 +660,9 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
     if action == "send":
         await state.update_data(phone=phone, page=page)
         await callback_query.message.edit_text(
-            "✉️ <b>[sᴇɴᴅ ᴍᴇssᴀɢᴇ] sᴛᴇᴘ 1/2</b>\n\n"
-            "👉 ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴛʜᴇ <b>ᴜsᴇʀ ɪᴅ, ᴜsᴇʀɴᴀᴍᴇ, ᴏʀ ᴛ.ᴍᴇ ʟɪɴᴋ</b> of the target recipient:\n\n"
-            "👉 ᴘʀᴇss ᴄᴀɴᴄᴇʟ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ᴀʙᴏʀᴛ.",
+            "<b>[sᴇɴᴅ ᴍᴇssᴀɢᴇ] sᴛᴇᴘ 1/2</b>\n\n"
+            "ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴛʜᴇ <b>ᴜsᴇʀ ɪᴅ, ᴜsᴇʀɴᴀᴍᴇ, ᴏʀ ᴛ.ᴍᴇ ʟɪɴᴋ</b> of the target recipient:\n\n"
+            "ᴘʀᴇss ᴄᴀɴᴄᴇʟ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ᴀʙᴏʀᴛ.",
             reply_markup=get_back_to_panel_keyboard(phone, page),
             parse_mode="HTML"
         )
@@ -630,12 +689,12 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
             creation_date, account_age = estimate_account_age(me.id)
 
             # Fetch 2FA Status / Hint
-            two_fa_status = "ᴅɪsᴀʙʟᴇᴅ ❌"
+            two_fa_status = "ᴅɪsᴀʙʟᴇᴅ"
             hint_str = "ɴᴏɴᴇ"
             try:
                 hint = await client.get_password_hint()
                 if hint is not None:
-                    two_fa_status = "ᴇɴᴀʙʟᴇᴅ 🔐"
+                    two_fa_status = "ᴇɴᴀʙʟᴇᴅ"
                     hint_str = f"<code>{html.escape(hint)}</code>" if hint else "ᴇᴍᴘᴛʏ"
             except Exception:
                 pass
@@ -645,16 +704,16 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
             proxy_info = f"<code>{html.escape(proxy['hostname'])}:{proxy['port']}</code>" if proxy else "ᴅɪʀᴇᴄᴛ ᴄᴏɴɴᴇᴄᴛɪᴏɴ"
 
             # Map Trust/Verification Fields
-            premium_status = "✅" if getattr(me, "is_premium", False) else "✖️"
-            restricted_status = "✅" if getattr(me, "is_restricted", False) else "✖️"
+            premium_status = "" if getattr(me, "is_premium", False) else "✖️"
+            restricted_status = "" if getattr(me, "is_restricted", False) else "✖️"
             bot_status = "Yes" if getattr(me, "is_bot", False) else "No"
 
             if getattr(me, "is_scam", False):
-                trust_status = "❌ Scam"
+                trust_status = "Scam"
             elif getattr(me, "is_fake", False):
-                trust_status = "⚠️ Fake"
+                trust_status = "Fake"
             else:
-                trust_status = "✅ Clean"
+                trust_status = "Clean"
 
             premium_status = make_small_caps(premium_status)
             restricted_status = make_small_caps(restricted_status)
@@ -663,9 +722,9 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
 
             details_text = (
                 "━━━━━━━━━━━━━━━━━━━━━\n"
-                "📋 <b>ᴀᴄᴄᴏᴜɴᴛ ᴅᴇᴛᴀɪʟs</b>\n"
+                "<b>ᴀᴄᴄᴏᴜɴᴛ ᴅᴇᴛᴀɪʟs</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━━\n"
-                f"👤 <b>ɴᴀᴍᴇ:</b> <code>{html.escape(p_name)}</code>\n"
+                f"<b>ɴᴀᴍᴇ:</b> <code>{html.escape(p_name)}</code>\n"
                 f"📞 <b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>\n"
                 f"🆔 <b>ᴜsᴇʀ ɪᴅ:</b> <code>{me.id}</code>\n"
                 f"📅 <b><b>ᴄʀᴇᴀᴛɪᴏɴ ᴅᴀᴛᴇ:</b></b> {creation_date}\n"
@@ -673,10 +732,10 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
                 f"💠 <b><b>ᴘʀᴇᴍɪᴜᴍ:</b></b> {premium_status}\n"
                 f"🚫 <b><b>ʀᴇsᴛʀɪᴄᴛᴇᴅ:</b></b> {restricted_status}\n"
                 f"🤖 <b><b>ʙᴏᴛ:</b></b> {bot_status}\n"
-                f"🛡️ <b><b>ᴛʀᴜsᴛ:</b></b> {trust_status}\n"
+                f"<b><b>ᴛʀᴜsᴛ:</b></b> {trust_status}\n"
                 f"🏷️ <b><b>ᴜsᴇʀɴᴀᴍᴇ:</b></b> <code>{html.escape(username)}</code>\n"
                 f"🌐 <b><b>ᴅᴄ ɪᴅ:</b></b> <code>{me.dc_id}</code>\n"
-                f"🔐 <b>2ꜰᴀ sᴛᴀᴛᴜs:</b> {two_fa_status}\n"
+                f"<b>2ꜰᴀ sᴛᴀᴛᴜs:</b> {two_fa_status}\n"
                 f"📝 <b>2ꜰᴀ ʜɪɴᴛ:</b> {hint_str}\n"
                 f"🌐 <b>ᴘʀᴏxʏ:</b> {proxy_info}\n\n"
                 "✨ <b>ᴍᴀɴᴀɢᴇ ᴛʜɪs sᴇssɪᴏɴ ᴜsɪɴɢ ᴛʜᴇ ᴄᴏɴᴛʀᴏʟs ʙᴇʟᴏᴡ:</b>"
@@ -689,13 +748,13 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
             )
         except AuthKeyInvalid:
             await callback_query.message.edit_text(
-                f"❌ <b>sᴇssɪᴏɴ ɪs ɪɴᴠᴀʟɪᴅ / ᴇxᴘɪʀᴇᴅ</b> ꜰᴏʀ <code>{html.escape(phone)}</code>.",
+                f"<b>sᴇssɪᴏɴ ɪs ɪɴᴠᴀʟɪᴅ / ᴇxᴘɪʀᴇᴅ</b> ꜰᴏʀ <code>{html.escape(phone)}</code>.",
                 reply_markup=get_back_to_panel_keyboard(phone, page),
                 parse_mode="HTML"
             )
         except Exception as e:
             await callback_query.message.edit_text(
-                f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ꜰᴇᴛᴄʜ ᴅᴇᴛᴀɪʟs:</b> <code>{html.escape(str(e))}</code>",
+                f"<b>ꜰᴀɪʟᴇᴅ ᴛᴏ ꜰᴇᴛᴄʜ ᴅᴇᴛᴀɪʟs:</b> <code>{html.escape(str(e))}</code>",
                 reply_markup=get_back_to_panel_keyboard(phone, page),
                 parse_mode="HTML"
             )
@@ -735,24 +794,24 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
             )
 
             await callback_query.message.edit_text(
-                f"✅ <b>sᴇssɪᴏɴ ᴠᴇʀɪꜰɪᴇᴅ!</b>\n\n"
-                f"📱 <b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>\n"
-                f"👤 <b>ɴᴀᴍᴇ:</b> <code>{html.escape(p_name)}</code>\n"
-                f"🟢 <b>sᴛᴀᴛᴜs:</b> <b>ᴀᴄᴛɪᴠᴇ &amp; ᴠᴇʀɪꜰɪᴇᴅ</b> on ᴛᴇʟᴇɢʀᴀᴍ sᴇʀᴠᴇʀs.",
+                f"<b>sᴇssɪᴏɴ ᴠᴇʀɪꜰɪᴇᴅ!</b>\n\n"
+                f"<b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>\n"
+                f"<b>ɴᴀᴍᴇ:</b> <code>{html.escape(p_name)}</code>\n"
+                f"<b>sᴛᴀᴛᴜs:</b> <b>ᴀᴄᴛɪᴠᴇ &amp; ᴠᴇʀɪꜰɪᴇᴅ</b> on ᴛᴇʟᴇɢʀᴀᴍ sᴇʀᴠᴇʀs.",
                 reply_markup=get_back_to_panel_keyboard(phone, page),
                 parse_mode="HTML"
             )
         except AuthKeyInvalid:
             await callback_query.message.edit_text(
-                f"❌ <b>sᴇssɪᴏɴ ᴇxᴘɪʀᴇᴅ / ɪɴᴠᴀʟɪᴅ!</b>\n\n"
-                f"📱 <b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>\n"
-                f"🔴 <b>sᴛᴀᴛᴜs:</b> <b>ᴇxᴘɪʀᴇᴅ ᴏʀ ᴛᴇʀᴍɪɴᴀᴛᴇᴅ</b> by ᴜsᴇʀ.",
+                f"<b>sᴇssɪᴏɴ ᴇxᴘɪʀᴇᴅ / ɪɴᴠᴀʟɪᴅ!</b>\n\n"
+                f"<b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>\n"
+                f"<b>sᴛᴀᴛᴜs:</b> <b>ᴇxᴘɪʀᴇᴅ ᴏʀ ᴛᴇʀᴍɪɴᴀᴛᴇᴅ</b> by ᴜsᴇʀ.",
                 reply_markup=get_back_to_panel_keyboard(phone, page),
                 parse_mode="HTML"
             )
         except Exception as e:
             await callback_query.message.edit_text(
-                f"❌ <b>ᴠᴇʀɪꜰɪᴄᴀᴛɪᴏɴ ꜰᴀɪʟᴇᴅ:</b> <code>{html.escape(str(e))}</code>",
+                f"<b>ᴠᴇʀɪꜰɪᴄᴀᴛɪᴏɴ ꜰᴀɪʟᴇᴅ:</b> <code>{html.escape(str(e))}</code>",
                 reply_markup=get_back_to_panel_keyboard(phone, page),
                 parse_mode="HTML"
             )
@@ -767,9 +826,9 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
     # Handle Extract option
     if action == "extract":
         format_kbd = [
-            [InlineKeyboardButton(text="ᴘʏʀᴏɢʀᴀᴍ", callback_data=f"format_sel:pyrogram:extract:{phone}:{page}")],
-            [InlineKeyboardButton(text="ᴛᴇʟᴇᴛʜᴏɴ", callback_data=f"format_sel:telethon:extract:{phone}:{page}")],
-            [InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"view_acc:{phone}:{page}")]
+            [InlineKeyboardButton(text=make_small_caps("ᴘʏʀᴏɢʀᴀᴍ"), callback_data=f"format_sel:pyrogram:extract:{phone}:{page}")],
+            [InlineKeyboardButton(text=make_small_caps("ᴛᴇʟᴇᴛʜᴏɴ"), callback_data=f"format_sel:telethon:extract:{phone}:{page}")],
+            [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ"), callback_data=f"view_acc:{phone}:{page}")]
         ]
         await callback_query.message.edit_text(
             "🗂 <b>Choose the session format for export:</b>",
@@ -781,9 +840,9 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
     # Handle Export SQLite option
     if action == "export":
         format_kbd = [
-            [InlineKeyboardButton(text="ᴘʏʀᴏɢʀᴀᴍ", callback_data=f"format_sel:pyrogram:export:{phone}:{page}")],
-            [InlineKeyboardButton(text="ᴛᴇʟᴇᴛʜᴏɴ", callback_data=f"format_sel:telethon:export:{phone}:{page}")],
-            [InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"view_acc:{phone}:{page}")]
+            [InlineKeyboardButton(text=make_small_caps("ᴘʏʀᴏɢʀᴀᴍ"), callback_data=f"format_sel:pyrogram:export:{phone}:{page}")],
+            [InlineKeyboardButton(text=make_small_caps("ᴛᴇʟᴇᴛʜᴏɴ"), callback_data=f"format_sel:telethon:export:{phone}:{page}")],
+            [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ"), callback_data=f"view_acc:{phone}:{page}")]
         ]
         await callback_query.message.edit_text(
             "🗂 <b>Choose the session format for export:</b>",
@@ -798,24 +857,24 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
 
         sec_kbd = [
             [
-                InlineKeyboardButton(text="🆕 sᴇᴛ / ᴄʜᴀɴɢᴇ 2ꜰᴀ", callback_data=f"sec_opt:set_2fa:{phone}:{page}"),
-                InlineKeyboardButton(text="ʀᴇᴍᴏᴠᴇ 2ꜰᴀ", callback_data=f"sec_opt:remove_2fa:{phone}:{page}")
+                InlineKeyboardButton(text=make_small_caps("sᴇᴛ / ᴄʜᴀɴɢᴇ 2ꜰᴀ"), callback_data=f"sec_opt:set_2fa:{phone}:{page}"),
+                InlineKeyboardButton(text=make_small_caps("ʀᴇᴍᴏᴠᴇ 2ꜰᴀ"), callback_data=f"sec_opt:remove_2fa:{phone}:{page}")
             ],
             [
-                InlineKeyboardButton(text="💻 ᴠɪᴇᴡ sᴇssɪᴏɴs", callback_data=f"sec_opt:view_sessions:{phone}:{page}"),
-                InlineKeyboardButton(text="✏️ ʀᴇɴᴀᴍᴇ ᴘʀᴏꜰɪʟᴇ", callback_data=f"sec_opt:rename_profile:{phone}:{page}")
+                InlineKeyboardButton(text=make_small_caps("ᴠɪᴇᴡ sᴇssɪᴏɴs"), callback_data=f"sec_opt:view_sessions:{phone}:{page}"),
+                InlineKeyboardButton(text=make_small_caps("ʀᴇɴᴀᴍᴇ ᴘʀᴏꜰɪʟᴇ"), callback_data=f"sec_opt:rename_profile:{phone}:{page}")
             ],
             [
-                InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ᴘᴀɴᴇʟ", callback_data=f"view_acc:{phone}:{page}")
+                InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ ᴘᴀɴᴇʟ"), callback_data=f"view_acc:{phone}:{page}")
             ]
         ]
 
         await callback_query.message.edit_text(
             "━━━━━━━━━━━━━━━━━━━━━\n"
-            "🔐 <b>sᴇᴄᴜʀɪᴛʏ sᴇᴛᴛɪɴɢs</b>\n"
+            "<b>sᴇᴄᴜʀɪᴛʏ sᴇᴛᴛɪɴɢs</b>\n"
             "━━━━━━━━━━━━━━━━━━━━━\n"
-            f"📱 <b>ᴀᴄᴄᴏᴜɴᴛ:</b> <code>{html.escape(phone)}</code> | <code>{html.escape(p_name)}</code>\n\n"
-            "👉 <b><b>ᴄʜᴏᴏsᴇ ᴀɴ ᴀᴄᴛɪᴏɴ ʙᴇʟᴏᴡ:</b></b>",
+            f"<b>ᴀᴄᴄᴏᴜɴᴛ:</b> <code>{html.escape(phone)}</code> | <code>{html.escape(p_name)}</code>\n\n"
+            "<b><b>ᴄʜᴏᴏsᴇ ᴀɴ ᴀᴄᴛɪᴏɴ ʙᴇʟᴏᴡ:</b></b>",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=sec_kbd),
             parse_mode="HTML"
         )
@@ -824,7 +883,7 @@ async def process_account_options(callback_query: CallbackQuery, state: FSMConte
 @router.message(SendStates.waiting_for_target)
 async def process_send_target(message: Message, state: FSMContext):
     if not message.text:
-        await message.answer("⚠️ <b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ᴛᴀʀɢᴇᴛ ɪᴅ ᴏʀ ᴜsᴇʀɴᴀᴍᴇ.</b>", parse_mode="HTML")
+        await message.answer("<b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ᴛᴀʀɢᴇᴛ ɪᴅ ᴏʀ ᴜsᴇʀɴᴀᴍᴇ.</b>", parse_mode="HTML")
         return
 
     target_raw = message.text.strip()
@@ -840,10 +899,10 @@ async def process_send_target(message: Message, state: FSMContext):
     page = data.get("page", 0)
 
     await message.answer(
-        "✉️ <b>[sᴇɴᴅ ᴍᴇssᴀɢᴇ] sᴛᴇᴘ 2/2</b>\n\n"
-        f"👤 <b>ᴛᴀʀɢᴇᴛ:</b> <code>{html.escape(target)}</code>\n\n"
-        "👉 <b><b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴛʜᴇ ᴍᴇssᴀɢᴇ ᴛᴇxᴛ</b> you want to send below:</b>\n\n"
-        "👉 ᴘʀᴇss ᴄᴀɴᴄᴇʟ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ᴀʙᴏʀᴛ.",
+        "<b>[sᴇɴᴅ ᴍᴇssᴀɢᴇ] sᴛᴇᴘ 2/2</b>\n\n"
+        f"<b>ᴛᴀʀɢᴇᴛ:</b> <code>{html.escape(target)}</code>\n\n"
+        "<b><b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴛʜᴇ ᴍᴇssᴀɢᴇ ᴛᴇxᴛ</b> you want to send below:</b>\n\n"
+        "ᴘʀᴇss ᴄᴀɴᴄᴇʟ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ᴀʙᴏʀᴛ.",
         reply_markup=get_back_to_panel_keyboard(phone, page),
         parse_mode="HTML"
     )
@@ -852,7 +911,7 @@ async def process_send_target(message: Message, state: FSMContext):
 @router.message(SendStates.waiting_for_message)
 async def process_send_message(message: Message, state: FSMContext):
     if not message.text:
-        await message.answer("⚠️ <b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ᴛᴇxᴛ ᴍᴇssᴀɢᴇ.</b>", parse_mode="HTML")
+        await message.answer("<b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ᴛᴇxᴛ ᴍᴇssᴀɢᴇ.</b>", parse_mode="HTML")
         return
 
     msg_text = message.text.strip()
@@ -865,7 +924,7 @@ async def process_send_message(message: Message, state: FSMContext):
 
     acc = await get_account(phone, user_id=message.from_user.id)
     if not acc:
-        await message.answer("❌ <b>ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML")
+        await message.answer("<b>ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML")
         return
 
     session_str = decrypt_data(acc["encrypted_session"])
@@ -881,16 +940,16 @@ async def process_send_message(message: Message, state: FSMContext):
 
         await client.send_message(chat_id=resolved_target, text=msg_text)
         await status_msg.edit_text(
-            f"✅ <b><b>ᴍᴇssᴀɢᴇ sᴇɴᴛ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b></b>\n\n"
-            f"📱 <b>sᴇɴᴅᴇʀ:</b> <code>{html.escape(phone)}</code>\n"
-            f"👤 <b>ʀᴇᴄɪᴘɪᴇɴᴛ:</b> <code>{html.escape(str(target))}</code>\n"
+            f"<b><b>ᴍᴇssᴀɢᴇ sᴇɴᴛ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b></b>\n\n"
+            f"<b>sᴇɴᴅᴇʀ:</b> <code>{html.escape(phone)}</code>\n"
+            f"<b>ʀᴇᴄɪᴘɪᴇɴᴛ:</b> <code>{html.escape(str(target))}</code>\n"
             f"📝 <b>ᴍᴇssᴀɢᴇ:</b> <code>{html.escape(msg_text)}</code>",
             reply_markup=get_back_to_panel_keyboard(phone, page),
             parse_mode="HTML"
         )
     except Exception as e:
         await status_msg.edit_text(
-            f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ sᴇᴛ ᴍᴇssᴀɢᴇ:</b> <code>{html.escape(str(e))}</code>",
+            f"<b>ꜰᴀɪʟᴇᴅ ᴛᴏ sᴇᴛ ᴍᴇssᴀɢᴇ:</b> <code>{html.escape(str(e))}</code>",
             reply_markup=get_back_to_panel_keyboard(phone, page),
             parse_mode="HTML"
         )
@@ -915,11 +974,11 @@ async def process_security_options(callback_query: CallbackQuery, state: FSMCont
         await state.update_data(phone=phone, page=page)
         await callback_query.message.edit_text(
             "🆕 <b>[sᴇᴄᴜʀɪᴛʏ] sᴇᴛ / ᴄʜᴀɴɢᴇ 2ꜰᴀ ᴘᴀssᴡᴏʀᴅ</b>\n\n"
-            "👉 <b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ʏᴏᴜʀ ɴᴇᴡ ᴄʟᴏᴜᴅ ᴘᴀssᴡᴏʀᴅ ʙᴇʟᴏᴡ.</b>\n\n"
-            "⚠️ <b>ɪꜰ 2ꜰᴀ ɪs ᴀʟʀᴇᴀᴅʏ ᴇɴᴀʙʟᴇᴅ</b>, sᴇɴᴅ ʙᴏᴛʜ ᴛʜᴇ ᴄᴜʀʀᴇɴᴛ ᴀɴᴅ ɴᴇᴡ ᴘᴀssᴡᴏʀᴅ ɪɴ ᴛʜɪs ꜰᴏʀᴍᴀᴛ:\n"
+            "<b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ʏᴏᴜʀ ɴᴇᴡ ᴄʟᴏᴜᴅ ᴘᴀssᴡᴏʀᴅ ʙᴇʟᴏᴡ.</b>\n\n"
+            "<b>ɪꜰ 2ꜰᴀ ɪs ᴀʟʀᴇᴀᴅʏ ᴇɴᴀʙʟᴇᴅ</b>, sᴇɴᴅ ʙᴏᴛʜ ᴛʜᴇ ᴄᴜʀʀᴇɴᴛ ᴀɴᴅ ɴᴇᴡ ᴘᴀssᴡᴏʀᴅ ɪɴ ᴛʜɪs ꜰᴏʀᴍᴀᴛ:\n"
             "<code>ᴄᴜʀʀᴇɴᴛ_ᴘᴀssᴡᴏʀᴅ:ɴᴇᴡ_ᴘᴀssᴡᴏʀᴅ</code>\n\n"
             "<i>ᴇxᴀᴍᴘʟᴇ:</i> <code>ᴍʏᴏʟᴅᴘᴀss123:ᴍʏɴᴇᴡᴘᴀss456</code>\n\n"
-            "👉 ᴘʀᴇss ᴄᴀɴᴄᴇʟ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ᴀʙᴏʀᴛ.",
+            "ᴘʀᴇss ᴄᴀɴᴄᴇʟ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ᴀʙᴏʀᴛ.",
             reply_markup=get_back_to_panel_keyboard(phone, page),
             parse_mode="HTML"
         )
@@ -929,9 +988,9 @@ async def process_security_options(callback_query: CallbackQuery, state: FSMCont
     if sec_action == "remove_2fa":
         await state.update_data(phone=phone, page=page)
         await callback_query.message.edit_text(
-            "❌ <b>[sᴇᴄᴜʀɪᴛʏ] ʀᴇᴍᴏᴠᴇ 2ꜰᴀ ᴘᴀssᴡᴏʀᴅ</b>\n\n"
-            "👉 <b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴄʟᴏᴜᴅ ᴘᴀssᴡᴏʀᴅ ʙᴇʟᴏᴡ</b> ᴛᴏ ᴅɪsᴀʙʟᴇ 2ꜰᴀ ᴄᴏᴍᴘʟᴇᴛᴇʟʏ:\n\n"
-            "👉 ᴘʀᴇss ᴄᴀɴᴄᴇʟ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ᴀʙᴏʀᴛ.",
+            "<b>[sᴇᴄᴜʀɪᴛʏ] ʀᴇᴍᴏᴠᴇ 2ꜰᴀ ᴘᴀssᴡᴏʀᴅ</b>\n\n"
+            "<b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴄʟᴏᴜᴅ ᴘᴀssᴡᴏʀᴅ ʙᴇʟᴏᴡ</b> ᴛᴏ ᴅɪsᴀʙʟᴇ 2ꜰᴀ ᴄᴏᴍᴘʟᴇᴛᴇʟʏ:\n\n"
+            "ᴘʀᴇss ᴄᴀɴᴄᴇʟ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ᴀʙᴏʀᴛ.",
             reply_markup=get_back_to_panel_keyboard(phone, page),
             parse_mode="HTML"
         )
@@ -959,7 +1018,7 @@ async def process_security_options(callback_query: CallbackQuery, state: FSMCont
                 "━━━━━━━━━━━━━━━━━━━━━\n"
                 "💻 <b>ᴀᴄᴛɪᴠᴇ sᴇssɪᴏɴs</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━━\n"
-                f"📱 <b>ᴀᴄᴄᴏᴜɴᴛ:</b> <code>{html.escape(phone)}</code>\n\n"
+                f"<b>ᴀᴄᴄᴏᴜɴᴛ:</b> <code>{html.escape(phone)}</code>\n\n"
             )
 
             sess_buttons = []
@@ -971,25 +1030,25 @@ async def process_security_options(callback_query: CallbackQuery, state: FSMCont
                 country = auth.country or "ᴜɴᴋɴᴏᴡɴ"
                 created_dt = datetime.fromtimestamp(auth.date_created).strftime("%Y-%m-%d %H:%M")
 
-                status_label = "🟢 CURRENT" if auth.current else "⚪ ACTIVE"
+                status_label = "CURRENT" if auth.current else "⚪ ACTIVE"
 
                 sessions_text += (
                     f"<b>{i}. {html.escape(device)} ({html.escape(platform)})</b>\n"
-                    f"👉 <b>ᴀᴘᴘ:</b> {html.escape(app_name)}\n"
-                    f"👉 <b>ɪᴘ:</b> <code>{html.escape(ip_addr)}</code> ({html.escape(country)})\n"
-                    f"👉 <b><b>ᴄʀᴇᴀᴛᴇᴅ:</b></b> <code>{created_dt}</code>\n"
-                    f"⚡ <b>sᴛᴀᴛᴜs:</b> {status_label}\n\n"
+                    f"<b>ᴀᴘᴘ:</b> {html.escape(app_name)}\n"
+                    f"<b>ɪᴘ:</b> <code>{html.escape(ip_addr)}</code> ({html.escape(country)})\n"
+                    f"<b><b>ᴄʀᴇᴀᴛᴇᴅ:</b></b> <code>{created_dt}</code>\n"
+                    f"<b>sᴛᴀᴛᴜs:</b> {status_label}\n\n"
                 )
 
                 if not auth.current:
                     sess_buttons.append([
                         InlineKeyboardButton(
-                            text=f"🗑️ ʀᴇᴠᴏᴋᴇ: {device} | {country}",
+                            text=make_small_caps(f"revoke: {device} | {country}"),
                             callback_data=f"revoke_sess:{phone}:{auth.hash}:{page}"
                         )
                     ])
 
-            sess_buttons.append([InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ sᴇᴄᴜʀɪᴛʏ", callback_data=f"acc_opt:security:{phone}:{page}")])
+            sess_buttons.append([InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ sᴇᴄᴜʀɪᴛʏ"), callback_data=f"acc_opt:security:{phone}:{page}")])
 
             await callback_query.message.edit_text(
                 sessions_text,
@@ -998,7 +1057,7 @@ async def process_security_options(callback_query: CallbackQuery, state: FSMCont
             )
         except Exception as e:
             await callback_query.message.edit_text(
-                f"❌ <b><b>ꜰᴀɪʟᴇᴅ ᴛᴏ ꜰᴇᴛᴄʜ sᴇssɪᴏɴs:</b></b> <code>{html.escape(str(e))}</code>",
+                f"<b><b>ꜰᴀɪʟᴇᴅ ᴛᴏ ꜰᴇᴛᴄʜ sᴇssɪᴏɴs:</b></b> <code>{html.escape(str(e))}</code>",
                 reply_markup=get_back_to_panel_keyboard(phone, page),
                 parse_mode="HTML"
             )
@@ -1013,9 +1072,9 @@ async def process_security_options(callback_query: CallbackQuery, state: FSMCont
     if sec_action == "rename_profile":
         await state.update_data(phone=phone, page=page)
         await callback_query.message.edit_text(
-            "✏️ <b>[sᴇᴄᴜʀɪᴛʏ] ʀᴇɴᴀᴍᴇ ᴘʀᴏꜰɪʟᴇ</b>\n\n"
-            "👉 <b><b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴛʜᴇ ɴᴇᴡ ᴘʀᴏꜰɪʟᴇ ɴᴀᴍᴇ below:</b></b>\n\n"
-            "👉 ᴘʀᴇss ᴄᴀɴᴄᴇʟ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ᴀʙᴏʀᴛ.",
+            "<b>[sᴇᴄᴜʀɪᴛʏ] ʀᴇɴᴀᴍᴇ ᴘʀᴏꜰɪʟᴇ</b>\n\n"
+            "<b><b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴛʜᴇ ɴᴇᴡ ᴘʀᴏꜰɪʟᴇ ɴᴀᴍᴇ below:</b></b>\n\n"
+            "ᴘʀᴇss ᴄᴀɴᴄᴇʟ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ᴀʙᴏʀᴛ.",
             reply_markup=get_back_to_panel_keyboard(phone, page),
             parse_mode="HTML"
         )
@@ -1033,13 +1092,13 @@ async def process_revoke_session_prompt(callback_query: CallbackQuery):
 
     confirm_kbd = [
         [
-            InlineKeyboardButton(text="ʏᴇs, ʀᴇᴠᴏᴋᴇ", callback_data=f"confirm_rev:{phone}:{sess_hash}:{page}"),
-            InlineKeyboardButton(text="ɴᴏ, ᴄᴀɴᴄᴇʟ", callback_data=f"sec_opt:view_sessions:{phone}:{page}")
+            InlineKeyboardButton(text=make_small_caps("ʏᴇs, ʀᴇᴠᴏᴋᴇ"), callback_data=f"confirm_rev:{phone}:{sess_hash}:{page}"),
+            InlineKeyboardButton(text=make_small_caps("ɴᴏ, ᴄᴀɴᴄᴇʟ"), callback_data=f"sec_opt:view_sessions:{phone}:{page}")
         ]
     ]
 
     await callback_query.message.edit_text(
-        f"⚠️ <b>ᴀʀᴇ ʏᴏᴜ sᴜʀᴇ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ʀᴇᴠᴏᴋᴇ ᴛʜɪs sᴇssɪᴏɴ?</b>\n\n"
+        f"<b>ᴀʀᴇ ʏᴏᴜ sᴜʀᴇ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ʀᴇᴠᴏᴋᴇ ᴛʜɪs sᴇssɪᴏɴ?</b>\n\n"
         "ᴛʜɪs ᴀᴄᴛɪᴏɴ ᴡɪʟʟ ɪɴsᴛᴀɴᴛʟʏ terminate and log out the selected device.",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=confirm_kbd),
         parse_mode="HTML"
@@ -1070,17 +1129,17 @@ async def process_confirm_revoke_session(callback_query: CallbackQuery):
         await client.invoke(raw.functions.account.ResetAuthorization(hash=sess_hash))
 
         await callback_query.message.edit_text(
-            f"✅ <b>sᴇssɪᴏɴ ʀᴇᴠᴏᴋᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b>",
+            f"<b>sᴇssɪᴏɴ ʀᴇᴠᴏᴋᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b>",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ sᴇssɪᴏɴs ʟɪsᴛ", callback_data=f"sec_opt:view_sessions:{phone}:{page}")]
+                [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ sᴇssɪᴏɴs ʟɪsᴛ"), callback_data=f"sec_opt:view_sessions:{phone}:{page}")]
             ]),
             parse_mode="HTML"
         )
     except Exception as e:
         await callback_query.message.edit_text(
-            f"❌ <b><b>ꜰᴀɪʟᴇᴅ ᴛᴏ ʀᴇᴠᴏᴋᴇ sᴇssɪᴏɴ:</b></b> <code>{html.escape(str(e))}</code>",
+            f"<b><b>ꜰᴀɪʟᴇᴅ ᴛᴏ ʀᴇᴠᴏᴋᴇ sᴇssɪᴏɴ:</b></b> <code>{html.escape(str(e))}</code>",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ sᴇssɪᴏɴs ʟɪsᴛ", callback_data=f"sec_opt:view_sessions:{phone}:{page}")]
+                [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ sᴇssɪᴏɴs ʟɪsᴛ"), callback_data=f"sec_opt:view_sessions:{phone}:{page}")]
             ]),
             parse_mode="HTML"
         )
@@ -1094,7 +1153,7 @@ async def process_confirm_revoke_session(callback_query: CallbackQuery):
 @router.message(SecurityStates.waiting_for_new_name)
 async def process_new_profile_name(message: Message, state: FSMContext):
     if not message.text:
-        await message.answer("⚠️ <b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ɴᴀᴍᴇ.</b>", parse_mode="HTML")
+        await message.answer("<b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ɴᴀᴍᴇ.</b>", parse_mode="HTML")
         return
 
     new_name = message.text.strip()
@@ -1106,7 +1165,7 @@ async def process_new_profile_name(message: Message, state: FSMContext):
 
     acc = await get_account(phone, user_id=message.from_user.id)
     if not acc:
-        await message.answer("❌ <b>ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML")
+        await message.answer("<b>ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML")
         return
 
     session_str = decrypt_data(acc["encrypted_session"])
@@ -1135,15 +1194,15 @@ async def process_new_profile_name(message: Message, state: FSMContext):
         )
 
         await status_msg.edit_text(
-            f"✅ <b>ᴘʀᴏꜰɪʟᴇ ʀᴇɴᴀᴍᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b>\n\n"
-            f"📱 <b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>\n"
-            f"👤 <b>ɴᴇᴡ ɴᴀᴍᴇ:</b> <code>{html.escape(new_name)}</code>",
+            f"<b>ᴘʀᴏꜰɪʟᴇ ʀᴇɴᴀᴍᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b>\n\n"
+            f"<b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>\n"
+            f"<b>ɴᴇᴡ ɴᴀᴍᴇ:</b> <code>{html.escape(new_name)}</code>",
             reply_markup=get_back_to_panel_keyboard(phone, page),
             parse_mode="HTML"
         )
     except Exception as e:
         await status_msg.edit_text(
-            f"❌ <b><b><b>ꜰᴀɪʟᴇᴅ ᴛᴏ ʀᴇɴᴀᴍᴇ ᴘʀᴏꜰɪʟᴇ:</b></b></b> <code>{html.escape(str(e))}</code>",
+            f"<b><b><b>ꜰᴀɪʟᴇᴅ ᴛᴏ ʀᴇɴᴀᴍᴇ ᴘʀᴏꜰɪʟᴇ:</b></b></b> <code>{html.escape(str(e))}</code>",
             reply_markup=get_back_to_panel_keyboard(phone, page),
             parse_mode="HTML"
         )
@@ -1157,7 +1216,7 @@ async def process_new_profile_name(message: Message, state: FSMContext):
 @router.message(SecurityStates.waiting_for_new_2fa)
 async def process_set_2fa_text(message: Message, state: FSMContext):
     if not message.text:
-        await message.answer("⚠️ <b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ᴛᴇxᴛ ᴘᴀssᴡᴏʀᴅ.</b>", parse_mode="HTML")
+        await message.answer("<b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ᴛᴇxᴛ ᴘᴀssᴡᴏʀᴅ.</b>", parse_mode="HTML")
         return
     data = await state.get_data()
     phone = data.get("phone")
@@ -1168,7 +1227,7 @@ async def process_set_2fa_text(message: Message, state: FSMContext):
 
     acc = await get_account(phone, user_id=message.from_user.id)
     if not acc:
-        await message.answer("❌ <b>ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML")
+        await message.answer("<b>ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML")
         return
 
     session_str = decrypt_data(acc["encrypted_session"])
@@ -1188,8 +1247,8 @@ async def process_set_2fa_text(message: Message, state: FSMContext):
 
             await client.change_cloud_password(current_password=current_pwd, new_password=new_pwd)
             await status_msg.edit_text(
-                f"✅ <b>2ꜰᴀ ᴄʟᴏᴜᴅ ᴘᴀssᴡᴏʀᴅ ᴄʜᴀɴɢᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b>\n\n"
-                f"📱 <b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>\n"
+                f"<b>2ꜰᴀ ᴄʟᴏᴜᴅ ᴘᴀssᴡᴏʀᴅ ᴄʜᴀɴɢᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b>\n\n"
+                f"<b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>\n"
                 f"🔒 <b><b>ɴᴇᴡ ᴘᴀssᴡᴏʀᴅ:</b></b> <code>{html.escape(new_pwd)}</code>",
                 reply_markup=get_back_to_panel_keyboard(phone, page),
                 parse_mode="HTML"
@@ -1199,8 +1258,8 @@ async def process_set_2fa_text(message: Message, state: FSMContext):
             try:
                 await client.enable_cloud_password(password=new_pwd)
                 await status_msg.edit_text(
-                    f"✅ <b>2<b><b>ꜰᴀ ᴄʟᴏᴜᴅ ᴘᴀssᴡᴏʀᴅ sᴇᴛ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b></b></b>\n\n"
-                    f"📱 <b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>\n"
+                    f"<b>2<b><b>ꜰᴀ ᴄʟᴏᴜᴅ ᴘᴀssᴡᴏʀᴅ sᴇᴛ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b></b></b>\n\n"
+                    f"<b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>\n"
                     f"🔒 <b>ᴘᴀssᴡᴏʀᴅ:</b> <code>{html.escape(new_pwd)}</code>",
                     reply_markup=get_back_to_panel_keyboard(phone, page),
                     parse_mode="HTML"
@@ -1208,8 +1267,8 @@ async def process_set_2fa_text(message: Message, state: FSMContext):
             except ValueError as val_err:
                 if "already" in str(val_err).lower() or "active" in str(val_err).lower():
                     await status_msg.edit_text(
-                        f"⚠️ <b>2ꜰᴀ ɪs ᴀʟʀᴇᴀᴅʏ ᴇɴᴀʙʟᴇᴅ</b> on <code>{html.escape(phone)}</code>.\n\n"
-                        "👉 ᴘʟᴇᴀsᴇ retry by providing both the current and new password in this format:\n"
+                        f"<b>2ꜰᴀ ɪs ᴀʟʀᴇᴀᴅʏ ᴇɴᴀʙʟᴇᴅ</b> on <code>{html.escape(phone)}</code>.\n\n"
+                        "ᴘʟᴇᴀsᴇ retry by providing both the current and new password in this format:\n"
                         "<code>ᴄᴜʀʀᴇɴᴛ_ᴘᴀssᴡᴏʀᴅ:ɴᴇᴡ_ᴘᴀssᴡᴏʀᴅ</code>",
                         reply_markup=get_back_to_panel_keyboard(phone, page),
                         parse_mode="HTML"
@@ -1219,7 +1278,7 @@ async def process_set_2fa_text(message: Message, state: FSMContext):
 
     except Exception as e:
         await status_msg.edit_text(
-            f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ sᴇᴛ/ᴄʜᴀɴɢᴇ 2ꜰᴀ:</b> <code>{html.escape(str(e))}</code>",
+            f"<b>ꜰᴀɪʟᴇᴅ ᴛᴏ sᴇᴛ/ᴄʜᴀɴɢᴇ 2ꜰᴀ:</b> <code>{html.escape(str(e))}</code>",
             reply_markup=get_back_to_panel_keyboard(phone, page),
             parse_mode="HTML"
         )
@@ -1233,7 +1292,7 @@ async def process_set_2fa_text(message: Message, state: FSMContext):
 @router.message(SecurityStates.waiting_for_remove_2fa)
 async def process_remove_2fa_text(message: Message, state: FSMContext):
     if not message.text:
-        await message.answer("⚠️ <b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ᴛᴇxᴛ ᴘᴀssᴡᴏʀᴅ.</b>", parse_mode="HTML")
+        await message.answer("<b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ᴛᴇxᴛ ᴘᴀssᴡᴏʀᴅ.</b>", parse_mode="HTML")
         return
     data = await state.get_data()
     phone = data.get("phone")
@@ -1244,7 +1303,7 @@ async def process_remove_2fa_text(message: Message, state: FSMContext):
 
     acc = await get_account(phone, user_id=message.from_user.id)
     if not acc:
-        await message.answer("❌ <b>ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML")
+        await message.answer("<b>ᴀᴄᴄᴏᴜɴᴛ ɴᴏ ʟᴏɴɢᴇʀ ᴇxɪsᴛs.</b>", reply_markup=get_back_keyboard(), parse_mode="HTML")
         return
 
     session_str = decrypt_data(acc["encrypted_session"])
@@ -1258,15 +1317,15 @@ async def process_remove_2fa_text(message: Message, state: FSMContext):
         await client.start()
         await client.remove_cloud_password(password=pwd)
         await status_msg.edit_text(
-            f"✅ <b>2ꜰᴀ ᴄʟᴏᴜᴅ ᴘᴀssᴡᴏʀᴅ ʀᴇᴍᴏᴠᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b>\n\n"
-            f"📱 <b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>\n"
-            f"🔓 <b>2<b>ꜰᴀ sᴛᴀᴛᴜs:</b></b> ᴅɪsᴀʙʟᴇᴅ ❌",
+            f"<b>2ꜰᴀ ᴄʟᴏᴜᴅ ᴘᴀssᴡᴏʀᴅ ʀᴇᴍᴏᴠᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b>\n\n"
+            f"<b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>\n"
+            f"🔓 <b>2<b>ꜰᴀ sᴛᴀᴛᴜs:</b></b> ᴅɪsᴀʙʟᴇᴅ",
             reply_markup=get_back_to_panel_keyboard(phone, page),
             parse_mode="HTML"
         )
     except Exception as e:
         await status_msg.edit_text(
-            f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ʀᴇᴍᴏᴠᴇ 2ꜰᴀ:</b> <code>{html.escape(str(e))}</code>",
+            f"<b>ꜰᴀɪʟᴇᴅ ᴛᴏ ʀᴇᴍᴏᴠᴇ 2ꜰᴀ:</b> <code>{html.escape(str(e))}</code>",
             reply_markup=get_back_to_panel_keyboard(phone, page),
             parse_mode="HTML"
         )
@@ -1287,9 +1346,9 @@ async def bulk_export_prompt_handler(callback_query: CallbackQuery):
     page = int(parts[2]) if len(parts) > 2 else 0
 
     format_kbd = [
-        [InlineKeyboardButton(text="ᴘʏʀᴏɢʀᴀᴍ", callback_data=f"format_sel_bulk:pyrogram:{action}:{page}")],
-        [InlineKeyboardButton(text="ᴛᴇʟᴇᴛʜᴏɴ", callback_data=f"format_sel_bulk:telethon:{action}:{page}")],
-        [InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"bulk_export:menu:{page}")]
+        [InlineKeyboardButton(text=make_small_caps("ᴘʏʀᴏɢʀᴀᴍ"), callback_data=f"format_sel_bulk:pyrogram:{action}:{page}")],
+        [InlineKeyboardButton(text=make_small_caps("ᴛᴇʟᴇᴛʜᴏɴ"), callback_data=f"format_sel_bulk:telethon:{action}:{page}")],
+        [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ"), callback_data=f"bulk_export:menu:{page}")]
     ]
     await callback_query.message.edit_text(
         "🗂 <b>Choose the session format for export:</b>",
@@ -1311,9 +1370,9 @@ async def process_bulk_format_selection(callback_query: CallbackQuery):
 
     if not accounts:
         await callback_query.message.edit_text(
-            "📭 <b>ɴᴏ sᴀᴠᴇᴅ ᴛᴇʟᴇɢʀᴀᴍ ᴀᴄᴄᴏᴜɴᴛs ꜰᴏᴜɴᴅ ᴛᴏ ᴇxᴘᴏʀᴛ.</b>",
+            "<b>ɴᴏ sᴀᴠᴇᴅ ᴛᴇʟᴇɢʀᴀᴍ ᴀᴄᴄᴏᴜɴᴛs ꜰᴏᴜɴᴅ ᴛᴏ ᴇxᴘᴏʀᴛ.</b>",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
+                [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ"), callback_data=f"back_to_list:{page}")]
             ]),
             parse_mode="HTML"
         )
@@ -1349,13 +1408,13 @@ async def process_bulk_format_selection(callback_query: CallbackQuery):
                 await callback_query.bot.send_document(
                     chat_id=callback_query.message.chat.id,
                     document=FSInputFile(str(txt_path)),
-                    caption=f"📄 <b><b>ʙᴜʟᴋ sᴇssɪᴏɴ sᴛʀɪɴɢs (.ᴛxᴛ) ᴇxᴘᴏʀᴛᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b></b>\n\n📱 <b>ᴛᴏᴛᴀʟ ᴀᴄᴄᴏᴜɴᴛs:</b> <code>{len(accounts)}</code>",
+                    caption=f"📄 <b><b>ʙᴜʟᴋ sᴇssɪᴏɴ sᴛʀɪɴɢs (.ᴛxᴛ) ᴇxᴘᴏʀᴛᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b></b>\n\n<b>ᴛᴏᴛᴀʟ ᴀᴄᴄᴏᴜɴᴛs:</b> <code>{len(accounts)}</code>",
                     parse_mode="HTML"
                 )
                 await callback_query.message.edit_text(
-                    f"✅ <b>session strings text file sent successfully!</b>\n\n📱 <b>ᴛᴏᴛᴀʟ ᴀᴄᴄᴏᴜɴᴛs:</b> <code>{len(accounts)}</code>",
+                    f"<b>session strings text file sent successfully!</b>\n\n<b>ᴛᴏᴛᴀʟ ᴀᴄᴄᴏᴜɴᴛs:</b> <code>{len(accounts)}</code>",
                     reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                        [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
+                        [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ"), callback_data=f"back_to_list:{page}")]
                     ]),
                     parse_mode="HTML"
                 )
@@ -1365,9 +1424,9 @@ async def process_bulk_format_selection(callback_query: CallbackQuery):
         except Exception as txt_err:
             logger.exception("Error during text file bulk export")
             await callback_query.message.edit_text(
-                f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ɢᴇɴᴇʀᴀᴛᴇ ᴛᴇxᴛ ꜰɪʟᴇ:</b> <code>{html.escape(str(txt_err))}</code>",
+                f"<b>ꜰᴀɪʟᴇᴅ ᴛᴏ ɢᴇɴᴇʀᴀᴛᴇ ᴛᴇxᴛ ꜰɪʟᴇ:</b> <code>{html.escape(str(txt_err))}</code>",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
+                    [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ"), callback_data=f"back_to_list:{page}")]
                 ]),
                 parse_mode="HTML"
             )
@@ -1416,13 +1475,13 @@ async def process_bulk_format_selection(callback_query: CallbackQuery):
                 await callback_query.bot.send_document(
                     chat_id=callback_query.message.chat.id,
                     document=FSInputFile(str(zip_path)),
-                    caption=f"📦 <b>ʙᴜʟᴋ sᴇssɪᴏɴs (.ᴢɪᴘ) ᴇxᴘᴏʀᴛᴇᴅ sᴜᴄssꜰᴜʟʟʏ!</b>\n\n📱 <b>ᴛᴏᴛᴀʟ ᴀᴄᴄᴏᴜɴᴛs:</b> <code>{len(accounts)}</code>",
+                    caption=f"📦 <b>ʙᴜʟᴋ sᴇssɪᴏɴs (.ᴢɪᴘ) ᴇxᴘᴏʀᴛᴇᴅ sᴜᴄssꜰᴜʟʟʏ!</b>\n\n<b>ᴛᴏᴛᴀʟ ᴀᴄᴄᴏᴜɴᴛs:</b> <code>{len(accounts)}</code>",
                     parse_mode="HTML"
                 )
                 await callback_query.message.edit_text(
-                    f"✅ <b> sᴇssɪᴏɴs ZIP file sent successfully!</b>\n\n📱 <b>ᴛᴏᴛᴀʟ ᴀᴄᴄᴏᴜɴᴛs:</b> <code>{len(accounts)}</code>",
+                    f"<b> sᴇssɪᴏɴs ZIP file sent successfully!</b>\n\n<b>ᴛᴏᴛᴀʟ ᴀᴄᴄᴏᴜɴᴛs:</b> <code>{len(accounts)}</code>",
                     reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                        [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
+                        [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ"), callback_data=f"back_to_list:{page}")]
                     ]),
                     parse_mode="HTML"
                 )
@@ -1432,9 +1491,9 @@ async def process_bulk_format_selection(callback_query: CallbackQuery):
         except Exception as zip_err:
             logger.exception("Error during sqlite bulk export")
             await callback_query.message.edit_text(
-                f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ɢᴇɴᴇʀᴀᴛᴇ sǫʟɪᴛᴇ ᴢɪᴘ:</b> <code>{html.escape(str(zip_err))}</code>",
+                f"<b>ꜰᴀɪʟᴇᴅ ᴛᴏ ɢᴇɴᴇʀᴀᴛᴇ sǫʟɪᴛᴇ ᴢɪᴘ:</b> <code>{html.escape(str(zip_err))}</code>",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
+                    [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ"), callback_data=f"back_to_list:{page}")]
                 ]),
                 parse_mode="HTML"
             )
@@ -1484,13 +1543,13 @@ async def process_bulk_format_selection(callback_query: CallbackQuery):
                 await callback_query.bot.send_document(
                     chat_id=callback_query.message.chat.id,
                     document=FSInputFile(str(zip_path)),
-                    caption=f"🌀 <b>ʙᴜʟᴋ sᴇssɪᴏɴ sᴛʀɪɴɢs (.ᴢɪᴘ) ɢᴇɴᴇʀᴀᴛᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b>\n\n📱 <b>ᴛᴏᴛᴀʟ ᴀᴄᴄᴏᴜɴᴛs:</b> <code>{len(accounts)}</code>",
+                    caption=f"🌀 <b>ʙᴜʟᴋ sᴇssɪᴏɴ sᴛʀɪɴɢs (.ᴢɪᴘ) ɢᴇɴᴇʀᴀᴛᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b>\n\n<b>ᴛᴏᴛᴀʟ ᴀᴄᴄᴏᴜɴᴛs:</b> <code>{len(accounts)}</code>",
                     parse_mode="HTML"
                 )
                 await callback_query.message.edit_text(
-                    f"✅ <b>sᴇssɪᴏɴ sᴛʀɪɴɢs ZIP file sent successfully!</b>\n\n📱 <b>ᴛᴏᴛᴀʟ ᴀᴄᴄᴏᴜɴᴛs:</b> <code>{len(accounts)}</code>",
+                    f"<b>sᴇssɪᴏɴ sᴛʀɪɴɢs ZIP file sent successfully!</b>\n\n<b>ᴛᴏᴛᴀʟ ᴀᴄᴄᴏᴜɴᴛs:</b> <code>{len(accounts)}</code>",
                     reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                        [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
+                        [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ"), callback_data=f"back_to_list:{page}")]
                     ]),
                     parse_mode="HTML"
                 )
@@ -1500,9 +1559,9 @@ async def process_bulk_format_selection(callback_query: CallbackQuery):
         except Exception as zip_err:
             logger.exception("Error during strings bulk export")
             await callback_query.message.edit_text(
-                f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ɢᴇɴᴇʀᴀᴛᴇ sᴛʀɪɴɢs ᴢɪᴘ:</b> <code>{html.escape(str(zip_err))}</code>",
+                f"<b>ꜰᴀɪʟᴇᴅ ᴛᴏ ɢᴇɴᴇʀᴀᴛᴇ sᴛʀɪɴɢs ᴢɪᴘ:</b> <code>{html.escape(str(zip_err))}</code>",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
+                    [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ"), callback_data=f"back_to_list:{page}")]
                 ]),
                 parse_mode="HTML"
             )
@@ -1532,9 +1591,9 @@ async def bulk_export_handler(callback_query: CallbackQuery):
 
     if not accounts:
         await callback_query.message.edit_text(
-            "📭 <b>ɴᴏ sᴀᴠᴇᴅ ᴛᴇʟᴇɢʀᴀᴍ ᴀᴄᴄᴏᴜɴᴛs ꜰᴏᴜɴᴅ ᴛᴏ ᴇxᴘᴏʀᴛ.</b>",
+            "<b>ɴᴏ sᴀᴠᴇᴅ ᴛᴇʟᴇɢʀᴀᴍ ᴀᴄᴄᴏᴜɴᴛs ꜰᴏᴜɴᴅ ᴛᴏ ᴇxᴘᴏʀᴛ.</b>",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
+                [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ"), callback_data=f"back_to_list:{page}")]
             ]),
             parse_mode="HTML"
         )
@@ -1542,10 +1601,10 @@ async def bulk_export_handler(callback_query: CallbackQuery):
 
     if action == "menu":
         export_keyboard = [
-            [InlineKeyboardButton(text="📥 ᴇxᴘᴏʀᴛ ᴄᴜʀʀᴇɴᴛ sᴇssɪᴏɴs (.ᴢɪᴘ)", callback_data=f"bulk_export_prompt:sqlite:{page}")],
-            [InlineKeyboardButton(text="ɢᴇɴᴇʀᴀᴛᴇ ᴀʟʟ ɴᴇᴡ sᴇssɪᴏɴs (.ᴢɪᴘ)", callback_data=f"bulk_export_prompt:strings:{page}")],
-            [InlineKeyboardButton(text="ᴇxᴘᴏʀᴛ sɪɴɢʟᴇ ᴛᴇxᴛ ꜰɪʟᴇ (.ᴛxᴛ)", callback_data=f"bulk_export_prompt:text_file:{page}")],
-            [InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data=f"back_to_list:{page}")]
+            [InlineKeyboardButton(text=make_small_caps("ᴇxᴘᴏʀᴛ ᴄᴜʀʀᴇɴᴛ sᴇssɪᴏɴs (.ᴢɪᴘ)"), callback_data=f"bulk_export_prompt:sqlite:{page}")],
+            [InlineKeyboardButton(text=make_small_caps("ɢᴇɴᴇʀᴀᴛᴇ ᴀʟʟ ɴᴇᴡ sᴇssɪᴏɴs (.ᴢɪᴘ)"), callback_data=f"bulk_export_prompt:strings:{page}")],
+            [InlineKeyboardButton(text=make_small_caps("ᴇxᴘᴏʀᴛ sɪɴɢʟᴇ ᴛᴇxᴛ ꜰɪʟᴇ (.ᴛxᴛ)"), callback_data=f"bulk_export_prompt:text_file:{page}")],
+            [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ"), callback_data=f"back_to_list:{page}")]
         ]
         await callback_query.message.edit_text(
             "📦 <b>ʙᴜʟᴋ ᴇxᴘᴏʀᴛ / ɢᴇɴᴇʀᴀᴛᴇ</b>\n\n"
@@ -1569,17 +1628,61 @@ async def process_confirm_deletion(callback_query: CallbackQuery):
 
     if deleted:
         await callback_query.message.edit_text(
-            f"✅ <b>sᴜᴄᴄᴇssꜰᴜʟʟʏ ᴅᴇʟᴇᴛᴇᴅ ᴀᴄᴄᴏᴜɴᴛ:</b> <code>{html.escape(phone)}</code>",
+            f"<b>sᴜᴄᴄᴇssꜰᴜʟʟʏ ᴅᴇʟᴇᴛᴇᴅ ᴀᴄᴄᴏᴜɴᴛ:</b> <code>{html.escape(phone)}</code>",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
+                [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ"), callback_data=f"back_to_list:{page}")]
             ])
         )
     else:
         await callback_query.message.edit_text(
-            f"❌ <b><b>ꜰᴀɪʟᴇᴅ ᴏʀ ᴀʟʀᴇᴀᴅʏ ᴅᴇʟᴇᴛᴇᴅ ᴀᴄᴄᴏᴜɴᴛ</b></b> <code>{html.escape(phone)}</code>.",
+            f"<b><b>ꜰᴀɪʟᴇᴅ ᴏʀ ᴀʟʀᴇᴀᴅʏ ᴅᴇʟᴇᴛᴇᴅ ᴀᴄᴄᴏᴜɴᴛ</b></b> <code>{html.escape(phone)}</code>.",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ", callback_data=f"back_to_list:{page}")]
+                [InlineKeyboardButton(text=make_small_caps("ʙᴀᴄᴋ ᴛᴏ ʟɪsᴛ"), callback_data=f"back_to_list:{page}")]
             ])
         )
+
+@router.callback_query(F.data == "search_acc")
+async def process_search_acc(callback_query: CallbackQuery, state: FSMContext):
+    await callback_query.answer()
+    text = "ᴇɴᴛᴇʀ ᴀ ɴᴀᴍᴇ, ɪᴅ, ᴏʀ ʟᴇᴛᴛᴇʀ ᴛᴏ sᴇᴀʀᴄʜ ᴀᴄᴄᴏᴜɴᴛs:"
+    if callback_query.message.photo:
+        await callback_query.message.edit_media(
+            media=InputMediaPhoto(media=random.choice(IMAGES), caption=f"<b>{text}</b>", parse_mode="HTML", has_spoiler=True),
+            reply_markup=get_back_keyboard()
+        )
+    else:
+        await callback_query.message.edit_text(
+            f"<b>{text}</b>",
+            reply_markup=get_back_keyboard(),
+            parse_mode="HTML"
+        )
+    await state.set_state(SearchAccounts.waiting_for_query)
+
+@router.message(SearchAccounts.waiting_for_query)
+async def process_search_query(message: Message, state: FSMContext):
+    query = message.text.lower()
+    await state.clear()
+
+    accounts = await get_all_accounts(user_id=message.from_user.id)
+    filtered_accounts = []
+
+    for acc in accounts:
+        phone = str(acc.get("phone", "")).lower()
+        p_name = str(acc.get("profile_name", "")).lower()
+
+        if query in phone or query in p_name:
+            filtered_accounts.append(acc)
+
+    text = f"sᴇᴀʀᴄʜ ʀᴇsᴜʟᴛs ꜰᴏʀ '{query}':"
+    if not filtered_accounts:
+        text = f"ɴᴏ ᴀᴄᴄᴏᴜɴᴛs ꜰᴏᴜɴᴅ ᴍᴀᴛᴄʜɪɴɢ '{query}'."
+
+    await message.answer_photo(
+        photo=random.choice(IMAGES),
+        caption=f"<b>{text}</b>",
+        parse_mode="HTML",
+        reply_markup=get_accounts_keyboard(filtered_accounts, page=0),
+        has_spoiler=True
+    )
