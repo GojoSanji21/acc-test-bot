@@ -82,9 +82,9 @@ def get_welcome_text(first_name: str, user_id: int) -> str:
     safe_name = first_name.replace("<", "&lt;").replace(">", "&gt;")
     
     welcome_text = (
-        f"<blockquote>Heyy...! <b><a href=\"tg://user?id={user_id}\">{safe_name}</a></b> ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ᴀᴅᴠᴀɴᴄᴇᴅ ᴛᴇʟᴇɢʀᴀᴍ ɪᴅ sᴛᴏʀᴀɢᴇ ʙᴏᴛ!</blockquote>\n\n"
+        f"<blockquote>Heyy...! <b><a href=\"tg://user?id={user_id}\">{safe_name}</a></b> ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ᴀᴅᴠᴀɴᴄᴇᴅ ᴛᴇʟᴇɢʀᴀᴍ ɪᴅ sᴛᴏʀᴀɢᴇ ʙᴏᴛ!</blockquote>\n"
         f"<blockquote expandable>⚡ ᴛʜɪs ɴᴇxᴛ-ʟᴇᴠᴇʟ ᴅᴀsʜʙᴏᴀʀᴅ ʟᴇᴛs ʏᴏᴜ ᴇᴀsɪʟʏ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ᴀᴄᴄᴏᴜɴᴛs ᴇɴᴛɪʀᴇʟʏ ᴠɪᴀ ɪɴʟɪɴᴇ ʙᴜᴛᴛᴏɴs. ɴᴏ ᴄᴏᴍᴍᴀɴᴅs ɴᴇᴇᴅᴇᴅ!\n\n"
-        f"🛡️ ᴀʟʟ sᴛʀɪɴɢ sᴇssɪᴏɴs ᴀʀᴇ ꜰᴜʟʟʏ ᴇɴᴄʀʏᴘᴛᴇᴅ ᴜsɪɴɢ ᴀᴇs-256 ʜʏʙʀɪᴅ sᴇᴄᴜʀɪᴛʏ.</blockquote>\n\n"
+        f"🛡️ ᴀʟʟ sᴛʀɪɴɢ sᴇssɪᴏɴs ᴀʀᴇ ꜰᴜʟʟʏ ᴇɴᴄʀʏᴘᴛᴇᴅ ᴜsɪɴɢ ᴀᴇs-256 ʜʏʙʀɪᴅ sᴇᴄᴜʀɪᴛʏ.</blockquote>\n"
         f"<blockquote><b>🍟 ᴅᴇᴠᴇʟᴏᴘᴇʀ ᴄʀᴇᴅɪᴛ:</b> ᴅᴇᴠᴇʟᴏᴘᴇᴅ ᴡɪᴛʜ ❤️ ʙʏ <a href=\"https://t.me/Unrated_coder\">Unrated Coder</a></blockquote>"
     )
     return welcome_text
