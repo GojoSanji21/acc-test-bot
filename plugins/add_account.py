@@ -22,6 +22,7 @@ import logging
 import html
 import random
 import emoji
+from pyrogram.errors import RPCError, FloodWait, ChatAdminRequired, UserDeactivated, UsernameOccupied, UsernameInvalid, FreshResetAuthorisationForbidden
 from aiogram import Router, F, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -37,7 +38,9 @@ from pyrogram.errors import (
     PhoneCodeInvalid,
     PhoneCodeExpired,
     PasswordHashInvalid,
-    AuthKeyInvalid
+    AuthKeyInvalid,
+    Unauthorized,
+    AuthKeyUnregistered
 )
 
 logger = logging.getLogger("TGStorageBot.plugins.add_account")
@@ -100,6 +103,7 @@ def get_add_account_choice_keyboard() -> InlineKeyboardMarkup:
     ]
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
+
 # ----------------- TELETHON TO PYROGRAM CONVERTER -----------------
 def convert_telethon_string_to_pyrogram(telethon_string: str, fallback_api_id: int) -> str:
     import struct
@@ -124,6 +128,7 @@ def convert_telethon_string_to_pyrogram(telethon_string: str, fallback_api_id: i
         raise ValueError(f"Invalid Telethon string length (expected 263, got {len(decoded)})")
 
     dc_id, ip_bytes, port, auth_key = struct.unpack(">B4sH256s", decoded)
+
     user_id = 9999
     pyro_packed = struct.pack('>BI?256sQ?', dc_id, fallback_api_id, False, auth_key, user_id, False)
     return base64.urlsafe_b64encode(pyro_packed).decode().rstrip("=")
@@ -137,6 +142,7 @@ def parse_sqlite_to_pyrogram_string(db_path: str, fallback_api_id: int) -> str:
     
     with sqlite3.connect(db_path) as conn:
         cursor = conn.cursor()
+        
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='entities'")
         is_telethon = cursor.fetchone() is not None
         
@@ -146,7 +152,9 @@ def parse_sqlite_to_pyrogram_string(db_path: str, fallback_api_id: int) -> str:
             if not row:
                 raise ValueError("Telethon sessions table is empty.")
             dc_id, auth_key = row
+            
             user_id = 9999 
+                
             pyro_packed = struct.pack('>BI?256sQ?', dc_id, fallback_api_id, False, auth_key, user_id, False)
             return base64.urlsafe_b64encode(pyro_packed).decode().rstrip("=")
         else:
@@ -155,10 +163,13 @@ def parse_sqlite_to_pyrogram_string(db_path: str, fallback_api_id: int) -> str:
             if not row:
                 raise ValueError("Pyrogram sessions table is empty.")
             dc_id, api_id, test_mode, auth_key, user_id, is_bot = row
+            
             user_id = abs(int(user_id)) if user_id else 9999
+            
             pyro_packed = struct.pack('>BI?256sQ?', dc_id, int(api_id) if api_id else fallback_api_id, bool(test_mode), auth_key, user_id, bool(is_bot))
             return base64.urlsafe_b64encode(pyro_packed).decode().rstrip("=")
 # ------------------------------------------------------------------
+
 
 @router.callback_query(F.data == "menu:add_account")
 async def start_add_account_callback(callback_query: CallbackQuery, state: FSMContext):
@@ -306,7 +317,6 @@ async def process_telethon_string_or_file_upload(message: Message, state: FSMCon
                             filename = member.filename
                             normalized = filename.replace("\\", "/")
                             if normalized.startswith("/") or ".." in normalized.split("/"):
-                                logger.warning(f"Path traversal check failed for zip member: {filename}")
                                 continue
                             safe_members.append(member)
                         zip_ref.extractall(zip_extract_dir, members=safe_members)
@@ -334,7 +344,6 @@ async def process_telethon_string_or_file_upload(message: Message, state: FSMCon
                                     else:
                                         parsing_errors.append(f"{p.name} (no telethon session string found)")
                                 except Exception as txt_err:
-                                    logger.error(f"Failed to read file {p.name} from ZIP: {txt_err}")
                                     parsing_errors.append(f"{p.name} (read err: {str(txt_err)[:40]})")
 
                     if not sessions_to_import:
@@ -362,7 +371,6 @@ async def process_telethon_string_or_file_upload(message: Message, state: FSMCon
                     await process_telethon_bulk_import(message, state, unique_sessions, status_msg)
                     return
                 except Exception as zip_err:
-                    logger.exception("Error processing ZIP file")
                     await status_msg.edit_text(
                         f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ᴘʀᴏᴄᴇss ᴢɪᴘ:</b> <code>{html.escape(str(zip_err))}</code>",
                         parse_mode="HTML",
@@ -372,10 +380,8 @@ async def process_telethon_string_or_file_upload(message: Message, state: FSMCon
                     return
                 finally:
                     if zip_extract_dir.exists():
-                        try:
-                            shutil.rmtree(zip_extract_dir)
-                        except Exception:
-                            pass
+                        try: shutil.rmtree(zip_extract_dir)
+                        except Exception: pass
             else:
                 try:
                     with open(dest_path, "r", encoding="utf-8", errors="ignore") as f:
@@ -386,12 +392,7 @@ async def process_telethon_string_or_file_upload(message: Message, state: FSMCon
                     else:
                         session_str = content
                 except Exception as text_err:
-                    await message.answer(
-                        f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ʀᴇᴀᴅ ꜰɪʟᴇ:</b> <code>{html.escape(str(text_err))}</code>", 
-                        parse_mode="HTML", 
-                        reply_markup=get_back_keyboard(),
-                        link_preview_options=get_preview()
-                    )
+                    await message.answer(f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ʀᴇᴀᴅ ꜰɪʟᴇ:</b> <code>{html.escape(str(text_err))}</code>", parse_mode="HTML", reply_markup=get_back_keyboard(), link_preview_options=get_preview())
                     return
         elif message.text:
             content = message.text.strip()
@@ -401,32 +402,19 @@ async def process_telethon_string_or_file_upload(message: Message, state: FSMCon
             else:
                 session_str = content
         else:
-            await message.answer(
-                "⚠️ <b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ᴛᴇʟᴇᴛʜᴏɴ sᴇssɪᴏɴ sᴛʀɪɴɢ ᴏʀ ᴜᴘʟᴏᴀᴅ ᴀ ꜰɪʟᴇ.</b>", 
-                parse_mode="HTML", 
-                reply_markup=get_back_keyboard(),
-                link_preview_options=get_preview()
-            )
+            await message.answer("⚠️ <b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ᴛᴇʟᴇᴛʜᴏɴ sᴇssɪᴏɴ sᴛʀɪɴɢ ᴏʀ ᴜᴘʟᴏᴀᴅ ᴀ ꜰɪʟᴇ.</b>", parse_mode="HTML", reply_markup=get_back_keyboard(), link_preview_options=get_preview())
             return
 
         if not session_str or not session_str.startswith("1"):
-            await message.answer(
-                "⚠️ <b>ᴛʜᴇ sᴛʀɪɴɢ ᴅᴏᴇs ɴᴏᴛ ᴀᴘᴘᴇᴀʀ ᴛᴏ ʙᴇ ᴀ ᴠᴀʟɪᴅ ᴛᴇʟᴇᴛʜᴏɴ sᴇssɪᴏɴ (ᴍᴜsᴛ sᴛᴀʀᴛ ᴡɪᴛʜ '1').</b>", 
-                parse_mode="HTML", 
-                reply_markup=get_back_keyboard(),
-                link_preview_options=get_preview()
-            )
+            await message.answer("⚠️ <b>ᴛʜᴇ sᴛʀɪɴɢ ᴅᴏᴇs ɴᴏᴛ ᴀᴘᴘᴇᴀʀ ᴛᴏ ʙᴇ ᴀ ᴠᴀʟɪᴅ ᴛᴇʟᴇᴛʜᴏɴ sᴇssɪᴏɴ (ᴍᴜsᴛ sᴛᴀʀᴛ ᴡɪᴛʜ '1').</b>", parse_mode="HTML", reply_markup=get_back_keyboard(), link_preview_options=get_preview())
             return
 
-        conn_status = await message.answer("⏳ <b>ᴄᴏɴɴᴇᴄᴛɪɴɢ...</b>", parse_mode="HTML", link_preview_options=get_preview())
-        await process_telethon_bulk_import(message, state, [("string", session_str, "uploaded_string", None)], conn_status)
+        await process_telethon_bulk_import(message, state, [("string", session_str, "uploaded_string", None)], await message.answer("⏳ <b>ᴄᴏɴɴᴇᴄᴛɪɴɢ...</b>", parse_mode="HTML", link_preview_options=get_preview()))
 
     finally:
         if file_path_to_clean and os.path.exists(file_path_to_clean):
-            try:
-                os.remove(file_path_to_clean)
-            except:
-                pass
+            try: os.remove(file_path_to_clean)
+            except: pass
 
 async def process_telethon_bulk_import(message: Message, state: FSMContext, unique_sessions: list, status_msg: Message):
     import time
@@ -475,8 +463,12 @@ async def process_telethon_bulk_import(message: Message, state: FSMContext, uniq
 
             client = create_pyrogram_client(session_name=temp_name, session_string=pyro_str, proxy=proxy)
 
-            await client.start()
-            me = await client.get_me()
+            await client.connect()
+            try:
+                me = await client.get_me()
+            except (AuthKeyInvalid, Unauthorized, AuthKeyUnregistered):
+                raise AuthKeyInvalid("Session is dead")
+
             if not me:
                 raise ValueError("Could not retrieve account identity from get_me()")
 
@@ -484,33 +476,23 @@ async def process_telethon_bulk_import(message: Message, state: FSMContext, uniq
             if not phone:
                 phone = f"+{me.id}"
             else:
-                if not phone.startswith("+"):
-                    phone = f"+{phone}"
+                if not phone.startswith("+"): phone = f"+{phone}"
 
             first = me.first_name or ""
             last = me.last_name or ""
-            name_parts = [first, last]
-            profile_name = " ".join([p for p in name_parts if p.strip()]) or me.username or "ᴜɴᴋɴᴏᴡɴ"
+            profile_name = " ".join([p for p in [first, last] if p.strip()]) or me.username or "ᴜɴᴋɴᴏᴡɴ"
 
             exported_session_str = await client.export_session_string()
             encrypted_session = encrypt_data(exported_session_str)
-            await client.stop()
+            await client.disconnect()
 
-            saved = await save_account(
-                phone=phone,
-                encrypted_session=encrypted_session,
-                user_id=message.from_user.id,
-                proxy=proxy,
-                profile_name=profile_name
-            )
-            if saved:
-                success_count += 1
-            else:
-                other_failed_sessions.append((source_name, "Failed to save to MongoDB"))
+            saved = await save_account(phone=phone, encrypted_session=encrypted_session, user_id=message.from_user.id, proxy=proxy, profile_name=profile_name)
+            if saved: success_count += 1
+            else: other_failed_sessions.append((source_name, "Failed to save to MongoDB"))
 
-        except AuthKeyInvalid:
+        except (AuthKeyInvalid, Unauthorized, AuthKeyUnregistered):
             expired_sessions.append((source_name, "Session Expired / Revoked"))
-            try: await client.stop()
+            try: await client.disconnect()
             except: pass
         except Exception as err:
             err_str = str(err)
@@ -518,7 +500,7 @@ async def process_telethon_bulk_import(message: Message, state: FSMContext, uniq
                 expired_sessions.append((source_name, "Account Deactivated by Telegram"))
             else:
                 other_failed_sessions.append((source_name, err_str))
-            try: await client.stop()
+            try: await client.disconnect()
             except: pass
 
     summary_text = (
@@ -544,399 +526,20 @@ async def process_telethon_bulk_import(message: Message, state: FSMContext, uniq
     )
     await state.clear()
 
-@router.message(AddAccountStates.waiting_for_string_or_file)
-async def process_string_or_file_upload(message: Message, state: FSMContext):
-    import os
-    import io
-    import zipfile
-    import shutil
-    from pathlib import Path
 
-    session_str = None
-    file_path_to_clean = None
+@router.callback_query(F.data == "add_acc:phone")
+async def add_account_phone_callback(callback_query: CallbackQuery, state: FSMContext):
+    await callback_query.answer()
+    await callback_query.message.edit_text(
+        "<b>📱 ᴘʟᴇᴀsᴇ ᴇɴᴛᴇʀ ᴛʜᴇ ᴛᴇʟᴇɢʀᴀᴍ ᴘʜᴏɴᴇ ɴᴜᴍʙᴇʀ</b> ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴀᴅᴅ.\n"
+        "ɪɴᴄʟᴜᴅᴇ ᴛʜᴇ ᴄᴏᴜɴᴛʀʏ ᴄᴏᴅᴇ (ᴇ.ɢ., <code>+1234567890</code> ᴏʀ <code>+919876543210</code>):\n\n"
+        "ᴘʀᴇss ᴛʜᴇ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴀᴛ ᴀɴʏ ᴛɪᴍᴇ ᴛᴏ ᴄᴀɴᴄᴇʟ.",
+        parse_mode="HTML",
+        link_preview_options=get_preview(),
+        reply_markup=get_back_keyboard()
+    )
+    await state.set_state(AddAccountStates.waiting_for_phone)
 
-    try:
-        if message.document:
-            file_id = message.document.file_id
-            file_name = message.document.file_name or ""
-            
-            temp_dir = Path("temp_uploads")
-            temp_dir.mkdir(exist_ok=True)
-            dest_path = temp_dir / f"uploaded_{message.from_user.id}_{file_name}"
-            file_path_to_clean = dest_path
-            
-            bot_obj = message.bot
-            await bot_obj.download(file_id, destination=str(dest_path))
-            
-            if file_name.lower().endswith(".zip"):
-                status_msg = await message.answer(
-                    "⚙️ <b>ᴇxᴛʀᴀᴄᴛɪɴɢ ᴀɴᴅ ᴘᴀʀsɪɴɢ</b> <code>.zip</code> <b>ᴀʀᴄʜɪᴠᴇ...</b>", 
-                    parse_mode="HTML",
-                    link_preview_options=get_preview()
-                )
-                zip_extract_dir = temp_dir / f"extracted_{message.from_user.id}_{os.urandom(4).hex()}"
-                try:
-                    zip_extract_dir.mkdir(exist_ok=True, parents=True)
-                    with zipfile.ZipFile(dest_path, 'r') as zip_ref:
-                        safe_members = []
-                        for member in zip_ref.infolist():
-                            filename = member.filename
-                            normalized = filename.replace("\\", "/")
-                            if normalized.startswith("/") or ".." in normalized.split("/"):
-                                continue
-                            safe_members.append(member)
-                        zip_ref.extractall(zip_extract_dir, members=safe_members)
-                        
-                    sessions_to_import = []
-                    all_found_files = []
-                    parsing_errors = []
-                    
-                    for root, dirs, files in os.walk(zip_extract_dir):
-                        for file in files:
-                            p = Path(root) / file
-                            file_size = p.stat().st_size if p.exists() else 0
-                            all_found_files.append((p.name, file_size))
-                            if p.suffix.lower() == ".session":
-                                sessions_to_import.append(("file", p.stem, p.name, str(p.parent)))
-                            else:
-                                try:
-                                    with open(p, "r", encoding="utf-8", errors="ignore") as f:
-                                        content = f.read()
-                                    found_strings = re.findall(r"[a-zA-Z0-9+\-_=/]{100,}", content)
-                                    if found_strings:
-                                        for s in found_strings:
-                                            sessions_to_import.append(("string", s, p.name, None))
-                                    else:
-                                        parsing_errors.append(f"{p.name} (no session string found)")
-                                except Exception as txt_err:
-                                    parsing_errors.append(f"{p.name} (read err: {str(txt_err)[:40]})")
-                    
-                    if not sessions_to_import:
-                        files_list_str = ""
-                        for f_name, f_size in all_found_files[:15]:
-                            files_list_str += f"• <code>{html.escape(f_name)}</code> ({f_size} bytes)\n"
-                        if len(all_found_files) > 15:
-                            files_list_str += f"<i>...and {len(all_found_files) - 15} more files</i>\n"
-                        error_details = (
-                            "❌ <b>ɴᴏ ᴠᴀʟɪᴅ sᴇssɪᴏɴs ꜰᴏᴜɴᴅ ɪɴ ᴛʜᴇ ᴢɪᴘ ᴀʀᴄʜɪᴠᴇ.</b>\n\n"
-                            f"📁 <b>Files found in ZIP ({len(all_found_files)}):</b>\n"
-                            f"{files_list_str or '• None (ZIP may be empty or failed extraction)'}"
-                        )
-                        await status_msg.edit_text(
-                            error_details,
-                            parse_mode="HTML",
-                            reply_markup=get_back_keyboard(),
-                            link_preview_options=get_preview()
-                        )
-                        return
-                    
-                    unique_sessions = []
-                    seen_strings = set()
-                    for s_type, s_data, s_name, s_workdir in sessions_to_import:
-                        dedup_key = f"{s_workdir}/{s_data}" if s_type == "file" else s_data
-                        if dedup_key not in seen_strings:
-                            seen_strings.add(dedup_key)
-                            unique_sessions.append((s_type, s_data, s_name, s_workdir))
-                    
-                    success_count = 0
-                    expired_sessions = []
-                    other_failed_sessions = []
-                    
-                    import time
-                    total_sessions = len(unique_sessions)
-                    last_edit_time = time.time()
-                    
-                    def make_progress_bar(current: int, total: int) -> str:
-                        if total <= 0: return "░" * 10
-                        filled = int(10 * current // total)
-                        bar = "■" * filled + "□" * (10 - filled)
-                        pct = int((current / total) * 100)
-                        return f"<code>[{bar}]</code> <b>{pct}%</b>"
-                    
-                    for i, (s_type, s_data, source_name, s_workdir) in enumerate(unique_sessions, 1):
-                        now_time = time.time()
-                        if i == 1 or i == total_sessions or (now_time - last_edit_time >= 1.5):
-                            progress_text = (
-                                f"⏳ <b>ʙᴜʟᴋ ɪᴍᴘᴏʀᴛ ɪɴ ᴘʀᴏɢʀᴇss...</b>\n\n"
-                                f"📈 <b>ᴘʀᴏɢʀᴇss:</b> {make_progress_bar(i - 1, total_sessions)} (<code>{i - 1} / {total_sessions}</code>)\n"
-                                f"━━━━━━━━━━━━━━━━━━━━━\n"
-                                f"✅ <b>sᴜᴄᴄᴇss:</b> <code>{success_count}</code>\n"
-                                f"🔴 <b>ᴇxᴘɪʀᴇᴅ:</b> <code>{len(expired_sessions)}</code>\n"
-                                f"⚠️ <b>ꜰᴀɪʟᴇᴅ:</b> <code>{len(other_failed_sessions)}</code>\n"
-                                f"⏳ <b>ᴘᴇɴᴅɪɴɢ:</b> <code>{total_sessions - (i - 1)}</code>\n\n"
-                                f"⚡ <i>Processing: {html.escape(source_name)}...</i>"
-                            )
-                            try:
-                                await status_msg.edit_text(progress_text, parse_mode="HTML", link_preview_options=get_preview())
-                                last_edit_time = now_time
-                            except Exception:
-                                pass
-                                
-                        proxy, proxy_error = get_random_proxy()
-                        temp_name = f"uploaded_sess_zip_{message.from_user.id}_{i}"
-
-                        if s_type == "file":
-                            session_file_path = os.path.join(s_workdir, f"{s_data}.session")
-                            try:
-                                converted_str = parse_sqlite_to_pyrogram_string(session_file_path, API_ID)
-                                client = create_pyrogram_client(session_name=temp_name, session_string=converted_str, proxy=proxy)
-                            except Exception as e:
-                                other_failed_sessions.append((source_name, f"DB Error: {e}"))
-                                continue
-                        else:
-                            s_data = normalize_session_string(s_data)
-                            client = create_pyrogram_client(session_name=temp_name, session_string=s_data, proxy=proxy)
-                            
-                        try:
-                            await client.start()
-                            me = await client.get_me()
-                            if not me:
-                                raise ValueError("Could not retrieve account identity from get_me()")
-                            
-                            phone = getattr(me, "phone_number", None)
-                            if not phone:
-                                import re
-                                phone_match = re.search(r'\d+', s_data if s_type == "file" else temp_name)
-                                if phone_match: phone = f"+{phone_match.group(0)}"
-                                else: phone = f"+{me.id}"
-                            else:
-                                if not phone.startswith("+"): phone = f"+{phone}"
-                                    
-                            first = me.first_name or ""
-                            last = me.last_name or ""
-                            name_parts = [first, last]
-                            profile_name = " ".join([p for p in name_parts if p.strip()]) or me.username or "ᴜɴᴋɴᴏᴡɴ"
-                            
-                            exported_session_str = await client.export_session_string()
-                            encrypted_session = encrypt_data(exported_session_str)
-                            await client.stop()
-                            
-                            saved = await save_account(phone=phone, encrypted_session=encrypted_session, user_id=message.from_user.id, proxy=proxy, profile_name=profile_name)
-                            if saved: success_count += 1
-                            else: other_failed_sessions.append((source_name, "Failed to save to MongoDB"))
-                        except AuthKeyInvalid:
-                            expired_sessions.append((source_name, "Session Expired / Revoked"))
-                            try: await client.stop()
-                            except: pass
-                        except Exception as conn_err:
-                            err_str = str(conn_err)
-                            if "deactivated" in err_str.lower() or "deactive" in err_str.lower():
-                                expired_sessions.append((source_name, "Account Deactivated by Telegram"))
-                            else:
-                                other_failed_sessions.append((source_name, err_str))
-                            try: await client.stop()
-                            except: pass
-                                
-                    summary_text = (
-                        "📦 <b>ʙᴜʟᴋ ɪᴍᴘᴏʀᴛ sᴜᴍᴍᴀʀʏ</b>\n"
-                        "━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"✅ <b>sᴜᴄᴄᴇssꜰᴜʟʟʏ ɪᴍᴘᴏʀᴛᴇᴅ:</b> <code>{success_count} / {len(unique_sessions)}</code> accounts\n"
-                    )
-                    if expired_sessions:
-                        summary_text += f"\n🔴 <b>ᴇxᴘɪʀᴇᴅ / ɪɴᴠᴀʟɪᴅ sᴇssɪᴏɴs:</b> <code>{len(expired_sessions)}</code>\n"
-                    if other_failed_sessions:
-                        summary_text += f"\n⚠️ <b>ᴏᴛʜᴇʀ ꜰᴀɪʟᴜʀᴇs:</b> <code>{len(other_failed_sessions)}</code>\n"
-                    if not expired_sessions and not other_failed_sessions:
-                        summary_text += "\n🟢 <b>All sessions imported successfully!</b>"
-                        
-                    await status_msg.delete()
-                    await message.answer(
-                        summary_text,
-                        parse_mode="HTML",
-                        link_preview_options=get_preview(),
-                        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                            [InlineKeyboardButton(text=make_small_caps("back to main menu"), callback_data="menu:main")]
-                        ])
-                    )
-                    await state.clear()
-                    return
-                except Exception as zip_err:
-                    await status_msg.edit_text(
-                        f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ᴘʀᴏᴄᴇss ᴢɪᴘ:</b> <code>{html.escape(str(zip_err))}</code>",
-                        parse_mode="HTML",
-                        link_preview_options=get_preview(),
-                        reply_markup=get_back_keyboard()
-                    )
-                    return
-                finally:
-                    if zip_extract_dir.exists():
-                        try: shutil.rmtree(zip_extract_dir)
-                        except Exception: pass
-                            
-            elif file_name.lower().endswith(".session"):
-                status_msg = await message.answer("⚙️ <b>ᴘᴀʀsɪɴɢ sǫʟɪᴛᴇ</b> <code>.session</code> <b>ꜰɪʟᴇ...</b>", parse_mode="HTML", link_preview_options=get_preview())
-                try:
-                    session_db_name = dest_path.stem
-                    proxy, proxy_error = get_random_proxy()
-
-                    try:
-                        session_str = parse_sqlite_to_pyrogram_string(str(dest_path), API_ID)
-                        temp_name = f"sess_telethon_{message.from_user.id}"
-                        client = create_pyrogram_client(session_name=temp_name, session_string=session_str, proxy=proxy)
-                        await client.start()
-                    except Exception as parse_e:
-                        raise ValueError(f"Could not find or parse session data: {parse_e}")
-
-                    me = await client.get_me()
-                    if not me: raise ValueError("Could not retrieve account identity")
-                    
-                    phone = getattr(me, "phone_number", None)
-                    if not phone:
-                        import re
-                        phone_match = re.search(r'\d+', session_db_name)
-                        if phone_match: phone = f"+{phone_match.group(0)}"
-                        else: phone = f"+{me.id}"
-                    else:
-                        if not phone.startswith("+"): phone = f"+{phone}"
-                            
-                    first = me.first_name or ""
-                    last = me.last_name or ""
-                    profile_name = " ".join([p for p in [first, last] if p.strip()]) or me.username or "ᴜɴᴋɴᴏᴡɴ"
-                    
-                    session_str_final = await client.export_session_string()
-                    encrypted_session = encrypt_data(session_str_final)
-                    await client.stop()
-                    
-                    success = await save_account(phone=phone, encrypted_session=encrypted_session, user_id=message.from_user.id, proxy=proxy, profile_name=profile_name)
-                    await status_msg.delete()
-                    if success:
-                        proxy_info = f"<code>{html.escape(proxy['hostname'])}:{proxy['port']}</code>" if proxy else "ɴᴏɴᴇ (ᴅɪʀᴇᴄᴛ)"
-                        await message.answer(
-                            f"✅ <b>ᴀᴄᴄᴏᴜɴᴛ ᴀᴅᴅᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ ᴠɪᴀ ᴜᴘʟᴏᴀᴅ!</b>\n\n"
-                            f"👤 <b>ɴᴀᴍᴇ:</b> <code>{html.escape(profile_name)}</code>\n"
-                            f"📱 <b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>\n"
-                            f"🔒 <b>sᴇssɪᴏɴ sᴛʀɪɴɢ:</b> ᴇɴᴄʀʏᴘᴛᴇᴅ &amp; sᴀᴠᴇᴅ sᴇᴄᴜʀᴇʟʏ.\n"
-                            f"🌐 <b>ʙᴏᴜɴᴅ ᴘʀᴏxʏ:</b> {proxy_info}\n\n"
-                            f"ʏᴏᴜ ᴄᴀɴ ɴᴏᴡ ᴍᴀɴᴀɢᴇ ᴛʜɪs sᴇssɪᴏɴ inside the account panel.",
-                            parse_mode="HTML",
-                            link_preview_options=get_preview(),
-                            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                                [InlineKeyboardButton(text=make_small_caps("back to main menu"), callback_data="menu:main")]
-                            ])
-                        )
-                        await state.clear()
-                    else:
-                        await message.answer(
-                            "❌ <b>ᴇʀʀᴏʀ ᴏᴄᴄᴜʀʀᴇᴅ ᴡʜɪʟᴇ sᴀᴠɪɴɢ ᴛᴏ ᴍᴏɴɢᴏᴅʙ. ᴘʟᴇᴀsᴇ ᴄʜᴇᴄᴋ ʟᴏɢs.</b>",
-                            parse_mode="HTML",
-                            link_preview_options=get_preview(),
-                            reply_markup=get_back_keyboard()
-                        )
-                    return
-                except Exception as db_err:
-                    await status_msg.delete()
-                    await message.answer(
-                        f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ᴘᴀʀsɪɴɢ sǫʟɪᴛᴇ sᴇssɪᴏɴ:</b> <code>{html.escape(str(db_err))}</code>",
-                        parse_mode="HTML",
-                        link_preview_options=get_preview(),
-                        reply_markup=get_back_keyboard()
-                    )
-                    try: await client.stop()
-                    except: pass
-                    return
-            else:
-                try:
-                    with open(dest_path, "r", encoding="utf-8", errors="ignore") as f:
-                        content = f.read().strip()
-                    found_strings = re.findall(r"[a-zA-Z0-9+\-_=/]{100,}", content)
-                    if found_strings: session_str = found_strings[0]
-                    else: session_str = content
-                except Exception as text_err:
-                    await message.answer(
-                        f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ʀᴇᴀᴅ ꜰɪʟᴇ:</b> <code>{html.escape(str(text_err))}</code>",
-                        parse_mode="HTML",
-                        link_preview_options=get_preview(),
-                        reply_markup=get_back_keyboard()
-                    )
-                    return
-                    
-        elif message.text:
-            content = message.text.strip()
-            found_strings = re.findall(r"[a-zA-Z0-9+\-_=/]{100,}", content)
-            if found_strings: session_str = found_strings[0]
-            else: session_str = content
-        else:
-            await message.answer(
-                "⚠️ <b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ sᴇssɪᴏɴ sᴛʀɪɴɢ ᴏʀ ᴜᴘʟᴏᴀᴅ ᴀ ꜰɪʟᴇ.</b>",
-                parse_mode="HTML",
-                link_preview_options=get_preview(),
-                reply_markup=get_back_keyboard()
-            )
-            return
-            
-        if not session_str:
-            await message.answer(
-                "⚠️ <b>ᴛʜᴇ sᴇssɪᴏɴ sᴛʀɪɴɢ ᴄᴏᴜʟᴅ ɴᴏᴛ ʙᴇ ᴇxᴛʀᴀᴄᴛᴇᴅ.</b> ᴘʟᴇᴀsᴇ ᴍᴀᴋᴇ sᴜʀᴇ ʏᴏᴜ sᴇɴᴛ ᴀ ɴᴏɴ-ᴇᴍᴘᴛʏ value.",
-                parse_mode="HTML",
-                link_preview_options=get_preview(),
-                reply_markup=get_back_keyboard()
-            )
-            return
-            
-        session_str = normalize_session_string(session_str)
-        status_msg = await message.answer("⏳ <b>ᴄᴏɴɴᴇᴄᴛɪɴɢ ᴛᴏ ᴛᴇʟᴇɢʀᴀᴍ sᴇʀᴠᴇʀs ᴜsɪɴɢ ᴘʀᴏᴠɪᴅᴇᴅ sᴇssɪᴏɴ...</b>", parse_mode="HTML", link_preview_options=get_preview())
-        proxy, proxy_error = get_random_proxy()
-        
-        temp_name = f"uploaded_sess_{message.from_user.id}"
-        client = create_pyrogram_client(session_name=temp_name, session_string=session_str, proxy=proxy)
-        
-        try:
-            await client.start()
-            me = await client.get_me()
-            if not me: raise ValueError("Could not retrieve account identity from get_me()")
-            phone = getattr(me, "phone_number", None)
-            if not phone: phone = f"+{me.id}"
-            elif not phone.startswith("+"): phone = f"+{phone}"
-                    
-            first = me.first_name or ""
-            last = me.last_name or ""
-            profile_name = " ".join([p for p in [first, last] if p.strip()]) or me.username or "ᴜɴᴋɴᴏᴡɴ"
-            
-            exported_session_str = await client.export_session_string()
-            encrypted_session = encrypt_data(exported_session_str)
-            await client.stop()
-            
-            success = await save_account(phone=phone, encrypted_session=encrypted_session, user_id=message.from_user.id, proxy=proxy, profile_name=profile_name)
-            await status_msg.delete()
-            
-            if success:
-                proxy_info = f"<code>{html.escape(proxy['hostname'])}:{proxy['port']}</code>" if proxy else "ɴᴏɴᴇ (ᴅɪʀᴇᴄᴛ)"
-                await message.answer(
-                    f"✅ <b>ᴀᴄᴄᴏᴜɴᴛ ᴀᴅᴅᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ ᴠɪᴀ ᴜᴘʟᴏᴀᴅ!</b>\n\n"
-                    f"👤 <b>ɴᴀᴍᴇ:</b> <code>{html.escape(profile_name)}</code>\n"
-                    f"📱 <b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>\n"
-                    f"🔒 <b>sᴇssɪᴏɴ sᴛʀɪɴɢ:</b> ᴇɴᴄʀʏᴘᴛᴇᴅ &amp; sᴀᴠᴇᴅ sᴇᴄᴜʀᴇʟʏ.\n"
-                    f"🌐 <b>ʙᴏᴜɴᴅ ᴘʀᴏxʏ:</b> {proxy_info}\n\n"
-                    f"ʏᴏᴜ ᴄᴀɴ ɴᴏᴡ ᴍᴀɴᴀɢᴇ ᴛʜɪs sᴇssɪᴏɴ inside the account panel.",
-                    parse_mode="HTML",
-                    link_preview_options=get_preview(),
-                    reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                        [InlineKeyboardButton(text=make_small_caps("back to main menu"), callback_data="menu:main")]
-                    ])
-                )
-                await state.clear()
-            else:
-                await message.answer(
-                    "❌ <b>ᴇʀʀᴏʀ ᴏᴄᴄᴜʀʀᴇᴅ ᴡʜɪʟᴇ sᴀᴠɪɴɢ ᴛᴏ ᴍᴏɴɢᴏᴅʙ. ᴘʟᴇᴀsᴇ ᴄʜᴇᴄᴋ ʟᴏɢs.</b>",
-                    parse_mode="HTML",
-                    link_preview_options=get_preview(),
-                    reply_markup=get_back_keyboard()
-                )
-        except Exception as conn_err:
-            await status_msg.delete()
-            await message.answer(
-                f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ᴀᴜᴛʜᴏʀɪᴢᴇ sᴇssɪᴏɴ:</b> <code>{html.escape(str(conn_err))}</code>\n\n"
-                "👉 Please ensure your session is alive and valid.",
-                parse_mode="HTML",
-                link_preview_options=get_preview(),
-                reply_markup=get_back_keyboard()
-            )
-            try: await client.stop()
-            except: pass
-    finally:
-        if file_path_to_clean and os.path.exists(file_path_to_clean):
-            try: os.remove(file_path_to_clean)
-            except Exception: pass
 
 @router.message(AddAccountStates.waiting_for_phone)
 async def process_phone(message: Message, state: FSMContext):
@@ -969,7 +572,7 @@ async def process_phone(message: Message, state: FSMContext):
     try:
         session_name = f"sess_{phone.replace('+', '')}"
         client = create_pyrogram_client(session_name=session_name, proxy=proxy)
-        await client.connect() # FIX: Use connect() instead of start() to prevent EOFError
+        await client.connect() # FIX: Bypass console prompt
         code_info = await client.send_code(phone)
         phone_code_hash = code_info.phone_code_hash
         await state.update_data(
@@ -1101,7 +704,7 @@ async def finalize_account_registration(message: Message, state: FSMContext, cli
             
         session_str = await client.export_session_string()
         encrypted_session = encrypt_data(session_str)
-        await client.disconnect() # FIX: Disconnect since we only used connect()
+        await client.disconnect()
         
         success = await save_account(
             phone=phone,
