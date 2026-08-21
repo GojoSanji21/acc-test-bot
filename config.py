@@ -34,7 +34,7 @@ logger = logging.getLogger("TGStorageBot")
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8368366261:AAGd-1uLPo8HWxhO05ZLenu2oIZquYeGLOM")
 API_ID = int(os.getenv("API_ID", "39800351"))
 API_HASH = os.getenv("API_HASH", "2a6fbe5d5c92adf1b49f9667be3598c3")
-MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://adilsh0137_db_user:E08VTbbalq1OQ44q@cluster0.s54nwax.mongodb.net/?appName=Naruto_new_season_bot")
+MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://adilsh0137_db_user:E08VTbbalq1OQ44q@cluster0.s54nwax.mongodb.net/?appName=accountbot")
 
 # Parse Owner ID
 OWNER_ID = int(os.getenv("OWNER_ID", "1683225887"))
