@@ -23,7 +23,7 @@ import asyncio
 import random
 from aiogram import Router, F, types
 from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
+from aiogram.types import Message, LinkPreviewOptions, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
 from database.methods import delete_all_accounts
 from database.connection import db
 from config import OWNER_ID
@@ -123,8 +123,18 @@ async def check_auth(user_id: int) -> bool:
 
 @router.message(Command("start"))
 async def send_welcome_cmd(message: Message):
-    await message.answer_sticker(random.choice(STICKERS))
+    try:
+        await message.delete()
+    except Exception:
+        pass
+
+    sticker_msg = await message.answer_sticker(random.choice(STICKERS))
     await asyncio.sleep(1.5)
+
+    try:
+        await sticker_msg.delete()
+    except Exception:
+        pass
 
     if not await check_auth(message.from_user.id):
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -133,12 +143,12 @@ async def send_welcome_cmd(message: Message):
         await message.answer("You're not a authorised user", reply_markup=keyboard)
         return
 
-    await message.answer_photo(
-        photo=random.choice(IMAGES),
-        caption=get_welcome_text(),
+    random_url = random.choice(IMAGES)
+    await message.answer(
+        text=get_welcome_text(),
         parse_mode="HTML",
         reply_markup=get_main_keyboard(),
-        has_spoiler=True
+        link_preview_options=LinkPreviewOptions(url=random_url, prefer_large_media=True)
     )
 
 @router.message(Command("help"))
@@ -166,17 +176,21 @@ async def remove_all_confirm_callback(callback_query: CallbackQuery):
     ])
 
     # Since previous message could be photo or text, edit text / caption accordingly
-    if callback_query.message.photo:
-        await callback_query.message.edit_caption(
-            caption="⚠️ <b>Are you sure you want to delete ALL saved sessions? This cannot be undone.</b>",
-            parse_mode="HTML",
-            reply_markup=keyboard
-        )
-    else:
+    try:
         await callback_query.message.edit_text(
             "⚠️ <b>Are you sure you want to delete ALL saved sessions? This cannot be undone.</b>",
             parse_mode="HTML",
-            reply_markup=keyboard
+            reply_markup=keyboard,
+            link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+        )
+    except Exception:
+        # Fallback if it's currently a photo message
+        await callback_query.message.delete()
+        await callback_query.message.answer(
+            "⚠️ <b>Are you sure you want to delete ALL saved sessions? This cannot be undone.</b>",
+            parse_mode="HTML",
+            reply_markup=keyboard,
+            link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
         )
 
 @router.callback_query(F.data == "menu:remove_all_yes")
@@ -185,65 +199,58 @@ async def remove_all_yes_callback(callback_query: CallbackQuery):
     deleted_count = await delete_all_accounts(callback_query.from_user.id)
     text = f"✅ <b>All sessions have been successfully removed.</b> (Deleted {deleted_count} accounts)"
 
-    if callback_query.message.photo:
-        await callback_query.message.edit_caption(
-            caption=text,
-            parse_mode="HTML",
-            reply_markup=get_back_keyboard()
-        )
-    else:
+    try:
         await callback_query.message.edit_text(
             text,
             parse_mode="HTML",
-            reply_markup=get_back_keyboard()
+            reply_markup=get_back_keyboard(),
+            link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+        )
+    except Exception:
+        await callback_query.message.delete()
+        await callback_query.message.answer(
+            text,
+            parse_mode="HTML",
+            reply_markup=get_back_keyboard(),
+            link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
         )
 
 @router.callback_query(F.data == "menu:main")
 async def back_to_main_callback(callback_query: CallbackQuery):
     await callback_query.answer()
 
-    if callback_query.message.photo:
-        # Edit existing photo's caption & media if we want to change image?
-        # The prompt says "The Main Menu & Dynamic Image". Does the user want a new random image when returning to main menu?
-        # "Main Menu & Dynamic Image - Random Image List... Pass this URL string directly to message.answer_photo(photo=url...). Main Menu Keyboard Layout..."
-        # If the existing message is a photo, we can just update its caption and keyboard.
-        try:
-            await callback_query.message.edit_media(
-                media=InputMediaPhoto(media=random.choice(IMAGES), caption=get_welcome_text(), parse_mode="HTML", has_spoiler=True),
-                reply_markup=get_main_keyboard()
-            )
-        except Exception:
-            # Fallback if edit_media fails
-            await callback_query.message.edit_caption(
-                caption=get_welcome_text(),
-                parse_mode="HTML",
-                reply_markup=get_main_keyboard()
-            )
-    else:
-        # If it was a text message (e.g. from /help), delete and send photo
-        await callback_query.message.delete()
-        await callback_query.message.answer_photo(
-            photo=random.choice(IMAGES),
-            caption=get_welcome_text(),
+    try:
+        await callback_query.message.edit_text(
+            text=get_welcome_text(),
             parse_mode="HTML",
             reply_markup=get_main_keyboard(),
-            has_spoiler=True
+            link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+        )
+    except Exception:
+        await callback_query.message.delete()
+        await callback_query.message.answer(
+            text=get_welcome_text(),
+            parse_mode="HTML",
+            reply_markup=get_main_keyboard(),
+            link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
         )
 
 @router.callback_query(F.data == "menu:help")
 async def help_callback(callback_query: CallbackQuery):
     await callback_query.answer()
 
-    if callback_query.message.photo:
-        await callback_query.message.edit_caption(
-            caption=get_help_text(),
-            parse_mode="HTML",
-            reply_markup=get_back_keyboard()
-        )
-    else:
+    try:
         await callback_query.message.edit_text(
             get_help_text(),
             parse_mode="HTML",
-            disable_web_page_preview=True,
-            reply_markup=get_back_keyboard()
+            reply_markup=get_back_keyboard(),
+            link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+        )
+    except Exception:
+        await callback_query.message.delete()
+        await callback_query.message.answer(
+            get_help_text(),
+            parse_mode="HTML",
+            reply_markup=get_back_keyboard(),
+            link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
         )
