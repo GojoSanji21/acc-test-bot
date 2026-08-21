@@ -20,11 +20,12 @@
 import re
 import logging
 import html
+import random
 from aiogram import Router, F, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, LinkPreviewOptions
 from config import API_ID, API_HASH
 from database import save_account
 from helpers import get_random_proxy, create_pyrogram_client, encrypt_data, normalize_session_string
@@ -41,6 +42,28 @@ from pyrogram.errors import (
 logger = logging.getLogger("TGStorageBot.plugins.add_account")
 router = Router()
 
+IMAGES = [
+    'https://graph.org/file/e8af951d867b0aaff8cb0-3205689663c5c662ba.jpg', 'https://graph.org/file/9ce76c7db28dc4daa5f27-b969a50f5a53345633.jpg',
+    'https://graph.org/file/3207c5504dc9d45f5d9cf-a8e081cb548479752f.jpg', 'https://graph.org/file/c31949e692d280663d58b-175b7206869b9a2c82.jpg',
+    'https://graph.org/file/800c9a3ee9ebc2097d38f-7609d3cf5ae42e41d5.jpg', 'https://graph.org/file/6e6502b5c2d6a68cac1c4-45a1ffc966477471c7.jpg',
+    'https://graph.org/file/826a285bb1b76717d6a0e-0a8d4d501cf45fc2db.jpg', 'https://graph.org/file/0a315ee59fbc73bc44326-a766d350855ca79eca.jpg',
+    'https://graph.org/file/ac509cacdbc03efbc2e8d-a8ac806b49a71e872d.jpg', 'https://graph.org/file/dd250b63501917843e481-3675d23c4799f97624.jpg',
+    'https://graph.org/file/161d918adb1682dd7e301-32d10ea7256daacfa4.jpg', 'https://graph.org/file/7626817e26de338d2e5a1-478b1b721ca9bc63d3.jpg',
+    'https://graph.org/file/dd250b63501917843e481-3675d23c4799f97624.jpg', 'https://graph.org/file/9c52583fba67124b6a183-586e58ffeeb840bc5e.jpg',
+    'https://graph.org/file/91621631e7dc800ea4562-4b0a9c3601a270556d.jpg', 'https://graph.org/file/91621631e7dc800ea4562-4b0a9c3601a270556d.jpg',
+    'https://graph.org/file/4abf7c572c4949e7f657e-3fbcdfd9fc67de5845.jpg', 'https://graph.org/file/89cddd266235b8a806f0e-6504ecc249b2e58ee7.jpg',
+    'https://graph.org/file/eace0fc6fa82c0ca3521a-a089e3306f6386977d.jpg', 'https://graph.org/file/a50cde78b6d61ebb76ccd-9d02a956a89fddadd8.jpg',
+    'https://graph.org/file/c77152bc70b96db0f079f-0cca0a31c983f97478.jpg', 'https://graph.org/file/019f4539cbecec208972c-c65454256e966a830c.jpg',
+    'https://graph.org/file/d7f8b0cf7cf78723b3aee-a5b041281c203e2449.jpg', 'https://graph.org/file/8a012335580d322e7438f-353fbd48e95b00f0f7.jpg',
+    'https://graph.org/file/c698be54a12027fb82e69-e9feef426481186208.jpg', 'https://graph.org/file/e3c28bdeb0c2af1b3bbb9-0c5a132aca7f768332.jpg',
+    'https://graph.org/file/d8b92bfb4b8932e2ae553-ff9264f5b40c710698.jpg', 'https://graph.org/file/deff1d9b2af3c0740b525-9032f27f051633a627.jpg',
+    'https://graph.org/file/a668600b4a516645369fa-465839cfd9e31ecf85.jpg', 'https://graph.org/file/f11e43b3ba09ff1af2eeb-a7d7c86298644597f3.jpg',
+    'https://graph.org/file/13b0eaf75f4ffd28cd445-6e5b90592458fc05f1.jpg'
+]
+
+def get_preview():
+    return LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
+
 class AddAccountStates(StatesGroup):
     waiting_for_phone = State()
     waiting_for_otp = State()
@@ -50,17 +73,16 @@ class AddAccountStates(StatesGroup):
 
 def get_back_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ᴍᴇɴᴜ", callback_data="menu:cancel_add")]
+        [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ᴍᴇɴᴜ", callback_data="menu:cancel_add")]
     ])
 
 def get_add_account_choice_keyboard() -> InlineKeyboardMarkup:
     keyboard = [
-        [InlineKeyboardButton(text="📱 ᴘʜᴏɴᴇ (ᴏᴛᴘ)", callback_data="add_acc:phone")],
-        [InlineKeyboardButton(text="📁 ᴜᴘʟᴏᴀᴅ sᴛʀɪɴɢ / ꜰɪʟᴇ", callback_data="add_acc:upload")],
-        [InlineKeyboardButton(text="🔙 ᴄᴀɴᴄᴇʟ", callback_data="menu:cancel_add")]
+        [InlineKeyboardButton(text="ᴘʜᴏɴᴇ (ᴏᴛᴘ)", callback_data="add_acc:phone")],
+        [InlineKeyboardButton(text="ᴜᴘʟᴏᴀᴅ sᴛʀɪɴɢ / ꜰɪʟᴇ", callback_data="add_acc:upload")],
+        [InlineKeyboardButton(text="ᴄᴀɴᴄᴇʟ", callback_data="menu:cancel_add")]
     ]
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
-
 
 # ----------------- TELETHON TO PYROGRAM CONVERTER -----------------
 def convert_telethon_string_to_pyrogram(telethon_string: str, fallback_api_id: int) -> str:
@@ -76,7 +98,6 @@ def convert_telethon_string_to_pyrogram(telethon_string: str, fallback_api_id: i
 
     import binascii
     base64_str = telethon_string[1:]
-    # Add padding if necessary
     base64_str += "=" * (-len(base64_str) % 4)
 
     try:
@@ -88,8 +109,6 @@ def convert_telethon_string_to_pyrogram(telethon_string: str, fallback_api_id: i
         raise ValueError(f"Invalid Telethon string length (expected 263, got {len(decoded)})")
 
     dc_id, ip_bytes, port, auth_key = struct.unpack(">B4sH256s", decoded)
-
-    # Repack into Pyrogram V2 using dummy user_id 9999
     user_id = 9999
     pyro_packed = struct.pack('>BI?256sQ?', dc_id, fallback_api_id, False, auth_key, user_id, False)
     return base64.urlsafe_b64encode(pyro_packed).decode().rstrip("=")
@@ -104,47 +123,38 @@ def parse_sqlite_to_pyrogram_string(db_path: str, fallback_api_id: int) -> str:
     
     with sqlite3.connect(db_path) as conn:
         cursor = conn.cursor()
-        
-        # Check if the DB is Telethon (has 'entities' table) or Pyrogram
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='entities'")
         is_telethon = cursor.fetchone() is not None
         
         if is_telethon:
-            # Telethon Extraction Logic
             cursor.execute("SELECT dc_id, auth_key FROM sessions")
             row = cursor.fetchone()
             if not row:
                 raise ValueError("Telethon sessions table is empty.")
             dc_id, auth_key = row
-            
-            # FIX: Use a dummy user_id to prevent "int too large" error caused by negative group IDs in Telethon.
             user_id = 9999 
-                
             pyro_packed = struct.pack('>BI?256sQ?', dc_id, fallback_api_id, False, auth_key, user_id, False)
             return base64.urlsafe_b64encode(pyro_packed).decode().rstrip("=")
         else:
-            # Pyrogram Extraction Logic
             cursor.execute("SELECT dc_id, api_id, test_mode, auth_key, user_id, is_bot FROM sessions")
             row = cursor.fetchone()
             if not row:
                 raise ValueError("Pyrogram sessions table is empty.")
             dc_id, api_id, test_mode, auth_key, user_id, is_bot = row
-            
             user_id = abs(int(user_id)) if user_id else 9999
-            
             pyro_packed = struct.pack('>BI?256sQ?', dc_id, int(api_id) if api_id else fallback_api_id, bool(test_mode), auth_key, user_id, bool(is_bot))
             return base64.urlsafe_b64encode(pyro_packed).decode().rstrip("=")
 # ------------------------------------------------------------------
-
 
 @router.callback_query(F.data == "menu:add_account")
 async def start_add_account_callback(callback_query: CallbackQuery, state: FSMContext):
     await callback_query.answer()
     await state.clear()
     await callback_query.message.edit_text(
-        "➕ <b>ᴀᴅᴅ ᴀᴄᴄᴏᴜɴᴛ</b>\n\n"
+        "<b>➕ ᴀᴅᴅ ᴀᴄᴄᴏᴜɴᴛ</b>\n\n"
         "ᴄʜᴏᴏsᴇ ʜᴏᴡ ᴛᴏ ᴀᴅᴅ:",
         parse_mode="HTML",
+        link_preview_options=get_preview(),
         reply_markup=get_add_account_choice_keyboard()
     )
 
@@ -152,9 +162,10 @@ async def start_add_account_callback(callback_query: CallbackQuery, state: FSMCo
 async def start_add_account(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(
-        "➕ <b>ᴀᴅᴅ ᴀᴄᴄᴏᴜɴᴛ</b>\n\n"
+        "<b>➕ ᴀᴅᴅ ᴀᴄᴄᴏᴜɴᴛ</b>\n\n"
         "ᴄʜᴏᴏsᴇ ʜᴏᴡ ᴛᴏ ᴀᴅᴅ:",
         parse_mode="HTML",
+        link_preview_options=get_preview(),
         reply_markup=get_add_account_choice_keyboard()
     )
 
@@ -162,10 +173,11 @@ async def start_add_account(message: Message, state: FSMContext):
 async def start_telethon_import(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(
-        "📁 <b>ᴛᴇʟᴇᴛʜᴏɴ ɪᴍᴘᴏʀᴛ</b>\n\n"
+        "<b>📁 ᴛᴇʟᴇᴛʜᴏɴ ɪᴍᴘᴏʀᴛ</b>\n\n"
         "👉 <b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ʏᴏᴜʀ Telethon sᴇssɪᴏɴ sᴛʀɪɴɢ</b> (starts with <code>1</code>) as a text message or a <code>.txt</code> file.\n\n"
         "👉 Alternatively, you can <b>upload a <code>.zip</code> archive</b> containing multiple text files with Telethon strings.",
         parse_mode="HTML",
+        link_preview_options=get_preview(),
         reply_markup=get_back_keyboard()
     )
     await state.set_state(AddAccountStates.waiting_for_telethon_string_or_file)
@@ -174,10 +186,11 @@ async def start_telethon_import(message: Message, state: FSMContext):
 async def add_account_phone_callback(callback_query: CallbackQuery, state: FSMContext):
     await callback_query.answer()
     await callback_query.message.edit_text(
-        "📱 <b>ᴘʟᴇᴀsᴇ ᴇɴᴛᴇʀ ᴛʜᴇ ᴛᴇʟᴇɢʀᴀᴍ ᴘʜᴏɴᴇ ɴᴜᴍʙᴇʀ</b> ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴀᴅᴅ.\n"
+        "<b>📱 ᴘʟᴇᴀsᴇ ᴇɴᴛᴇʀ ᴛʜᴇ ᴛᴇʟᴇɢʀᴀᴍ ᴘʜᴏɴᴇ ɴᴜᴍʙᴇʀ</b> ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴀᴅᴅ.\n"
         "ɪɴᴄʟᴜᴅᴇ ᴛʜᴇ ᴄᴏᴜɴᴛʀʏ ᴄᴏᴅᴇ (ᴇ.ɢ., <code>+1234567890</code> ᴏʀ <code>+919876543210</code>):\n\n"
         "ᴘʀᴇss ᴛʜᴇ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴀᴛ ᴀɴʏ ᴛɪᴍᴇ ᴛᴏ ᴄᴀɴᴄᴇʟ.",
         parse_mode="HTML",
+        link_preview_options=get_preview(),
         reply_markup=get_back_keyboard()
     )
     await state.set_state(AddAccountStates.waiting_for_phone)
@@ -186,10 +199,11 @@ async def add_account_phone_callback(callback_query: CallbackQuery, state: FSMCo
 async def add_account_upload_callback(callback_query: CallbackQuery, state: FSMContext):
     await callback_query.answer()
     await callback_query.message.edit_text(
-        "📁 <b>ᴜᴘʟᴏᴀᴅ sᴛʀɪɴɢ / ꜰɪʟᴇ</b>\n\n"
+        "<b>📁 ᴜᴘʟᴏᴀᴅ sᴛʀɪɴɢ / ꜰɪʟᴇ</b>\n\n"
         "👉 <b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ʏᴏᴜʀ Pyrogram sᴇssɪᴏɴ sᴛʀɪɴɢ</b> as a text message or a <code>.txt</code> file.\n\n"
         "👉 Alternatively, you can <b>upload a physical <code>.session</code> SQLite file</b>.",
         parse_mode="HTML",
+        link_preview_options=get_preview(),
         reply_markup=get_back_keyboard()
     )
     await state.set_state(AddAccountStates.waiting_for_string_or_file)
@@ -209,12 +223,12 @@ async def cancel_handler(message: Message, state: FSMContext):
         except Exception as e:
             logger.error(f"Error disconnecting client on cancel: {e}")
     await state.clear()
-    # Send cancel message with option to go back to main menu
     await message.answer(
         "❌ <b>ᴀᴄᴛɪᴏɴ ᴄᴀɴᴄᴇʟʟᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ.</b>",
         parse_mode="HTML",
+        link_preview_options=get_preview(),
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ᴍᴀɪɴ ᴍᴇɴᴜ", callback_data="menu:main")]
+            [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ᴍᴀɪɴ ᴍᴇɴᴜ", callback_data="menu:main")]
         ])
     )
 
@@ -233,8 +247,9 @@ async def cancel_add_callback(callback_query: CallbackQuery, state: FSMContext):
     await callback_query.message.edit_text(
         "❌ <b>ᴀᴄᴛɪᴏɴ ᴄᴀɴᴄᴇʟʟᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ.</b>",
         parse_mode="HTML",
+        link_preview_options=get_preview(),
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ᴍᴀɪɴ ᴍᴇɴᴜ", callback_data="menu:main")]
+            [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ᴍᴀɪɴ ᴍᴇɴᴜ", callback_data="menu:main")]
         ])
     )
 
@@ -262,7 +277,11 @@ async def process_telethon_string_or_file_upload(message: Message, state: FSMCon
             await bot_obj.download(file_id, destination=str(dest_path))
 
             if file_name.lower().endswith(".zip"):
-                status_msg = await message.answer("⚙️ ᴇxᴛʀᴀᴄᴛɪɴɢ ᴀɴᴅ ᴘᴀʀsɪɴɢ <code>.zip</code> ᴀʀᴄʜɪᴠᴇ ꜰᴏʀ ᴛᴇʟᴇᴛʜᴏɴ...", parse_mode="HTML")
+                status_msg = await message.answer(
+                    "⚙️ <b>ᴇxᴛʀᴀᴄᴛɪɴɢ ᴀɴᴅ ᴘᴀʀsɪɴɢ</b> <code>.zip</code> <b>ᴀʀᴄʜɪᴠᴇ ꜰᴏʀ ᴛᴇʟᴇᴛʜᴏɴ...</b>", 
+                    parse_mode="HTML",
+                    link_preview_options=get_preview()
+                )
                 zip_extract_dir = temp_dir / f"extracted_tel_{message.from_user.id}_{os.urandom(4).hex()}"
                 try:
                     zip_extract_dir.mkdir(exist_ok=True, parents=True)
@@ -294,7 +313,6 @@ async def process_telethon_string_or_file_upload(message: Message, state: FSMCon
                                 try:
                                     with open(p, "r", encoding="utf-8", errors="ignore") as f:
                                         content_f = f.read()
-                                    # Find base64 strings starting with 1
                                     found_strings = re.findall(r"1[a-zA-Z0-9+\-_=/]{300,}", content_f)
                                     if found_strings:
                                         for s in found_strings:
@@ -316,11 +334,9 @@ async def process_telethon_string_or_file_upload(message: Message, state: FSMCon
                             f"📁 <b>Files found in ZIP ({len(all_found_files)}):</b>\n"
                             f"{files_list_str or '• None'}"
                         )
-                        await status_msg.edit_text(error_details, parse_mode="HTML", reply_markup=get_back_keyboard())
+                        await status_msg.edit_text(error_details, parse_mode="HTML", reply_markup=get_back_keyboard(), link_preview_options=get_preview())
                         return
 
-                    # We will continue the processing loop in the next step
-                    # Store variables needed for processing
                     unique_sessions = []
                     seen_strings = set()
                     for s_type, s_data, s_name, s_workdir in sessions_to_import:
@@ -336,14 +352,15 @@ async def process_telethon_string_or_file_upload(message: Message, state: FSMCon
                     await status_msg.edit_text(
                         f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ᴘʀᴏᴄᴇss ᴢɪᴘ:</b> <code>{html.escape(str(zip_err))}</code>",
                         parse_mode="HTML",
-                        reply_markup=get_back_keyboard()
+                        reply_markup=get_back_keyboard(),
+                        link_preview_options=get_preview()
                     )
                     return
                 finally:
                     if zip_extract_dir.exists():
                         try:
                             shutil.rmtree(zip_extract_dir)
-                        except Exception as clean_err:
+                        except Exception:
                             pass
             else:
                 try:
@@ -355,7 +372,12 @@ async def process_telethon_string_or_file_upload(message: Message, state: FSMCon
                     else:
                         session_str = content
                 except Exception as text_err:
-                    await message.answer(f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ʀᴇᴀᴅ ꜰɪʟᴇ:</b> <code>{html.escape(str(text_err))}</code>", parse_mode="HTML", reply_markup=get_back_keyboard())
+                    await message.answer(
+                        f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ʀᴇᴀᴅ ꜰɪʟᴇ:</b> <code>{html.escape(str(text_err))}</code>", 
+                        parse_mode="HTML", 
+                        reply_markup=get_back_keyboard(),
+                        link_preview_options=get_preview()
+                    )
                     return
         elif message.text:
             content = message.text.strip()
@@ -365,14 +387,25 @@ async def process_telethon_string_or_file_upload(message: Message, state: FSMCon
             else:
                 session_str = content
         else:
-            await message.answer("⚠️ <b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ᴛᴇʟᴇᴛʜᴏɴ sᴇssɪᴏɴ sᴛʀɪɴɢ ᴏʀ ᴜᴘʟᴏᴀᴅ ᴀ ꜰɪʟᴇ.</b>", parse_mode="HTML", reply_markup=get_back_keyboard())
+            await message.answer(
+                "⚠️ <b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ᴛᴇʟᴇᴛʜᴏɴ sᴇssɪᴏɴ sᴛʀɪɴɢ ᴏʀ ᴜᴘʟᴏᴀᴅ ᴀ ꜰɪʟᴇ.</b>", 
+                parse_mode="HTML", 
+                reply_markup=get_back_keyboard(),
+                link_preview_options=get_preview()
+            )
             return
 
         if not session_str or not session_str.startswith("1"):
-            await message.answer("⚠️ <b>ᴛʜᴇ sᴛʀɪɴɢ ᴅᴏᴇs ɴᴏᴛ ᴀᴘᴘᴇᴀʀ ᴛᴏ ʙᴇ ᴀ ᴠᴀʟɪᴅ ᴛᴇʟᴇᴛʜᴏɴ sᴇssɪᴏɴ (ᴍᴜsᴛ sᴛᴀʀᴛ ᴡɪᴛʜ '1').</b>", parse_mode="HTML", reply_markup=get_back_keyboard())
+            await message.answer(
+                "⚠️ <b>ᴛʜᴇ sᴛʀɪɴɢ ᴅᴏᴇs ɴᴏᴛ ᴀᴘᴘᴇᴀʀ ᴛᴏ ʙᴇ ᴀ ᴠᴀʟɪᴅ ᴛᴇʟᴇᴛʜᴏɴ sᴇssɪᴏɴ (ᴍᴜsᴛ sᴛᴀʀᴛ ᴡɪᴛʜ '1').</b>", 
+                parse_mode="HTML", 
+                reply_markup=get_back_keyboard(),
+                link_preview_options=get_preview()
+            )
             return
 
-        await process_telethon_bulk_import(message, state, [("string", session_str, "uploaded_string", None)], await message.answer("⏳ <b>ᴄᴏɴɴᴇᴄᴛɪɴɢ...</b>", parse_mode="HTML"))
+        conn_status = await message.answer("⏳ <b>ᴄᴏɴɴᴇᴄᴛɪɴɢ...</b>", parse_mode="HTML", link_preview_options=get_preview())
+        await process_telethon_bulk_import(message, state, [("string", session_str, "uploaded_string", None)], conn_status)
 
     finally:
         if file_path_to_clean and os.path.exists(file_path_to_clean):
@@ -380,7 +413,6 @@ async def process_telethon_string_or_file_upload(message: Message, state: FSMCon
                 os.remove(file_path_to_clean)
             except:
                 pass
-
 
 async def process_telethon_bulk_import(message: Message, state: FSMContext, unique_sessions: list, status_msg: Message):
     import time
@@ -412,7 +444,7 @@ async def process_telethon_bulk_import(message: Message, state: FSMContext, uniq
                 f"⚡ <i>Processing: {html.escape(source_name)}...</i>"
             )
             try:
-                await status_msg.edit_text(progress_text, parse_mode="HTML")
+                await status_msg.edit_text(progress_text, parse_mode="HTML", link_preview_options=get_preview())
                 last_edit_time = now_time
             except:
                 pass
@@ -476,7 +508,7 @@ async def process_telethon_bulk_import(message: Message, state: FSMContext, uniq
             except: pass
 
     summary_text = (
-        "📦 <b>ᴛᴇʟᴇᴛʜᴏɴ ʙᴜʟᴋ ɪᴍᴘᴏʀᴛ sUMMARY</b>\n"
+        "📦 <b>ᴛᴇʟᴇᴛʜᴏɴ ʙᴜʟᴋ ɪᴍᴘᴏʀᴛ sᴜᴍᴍᴀʀʏ</b>\n"
         "━━━━━━━━━━━━━━━━━━━━━\n"
         f"✅ <b>sᴜᴄᴄᴇssꜰᴜʟʟʏ ɪᴍᴘᴏʀᴛᴇᴅ:</b> <code>{success_count} / {len(unique_sessions)}</code> accounts\n"
     )
@@ -491,12 +523,12 @@ async def process_telethon_bulk_import(message: Message, state: FSMContext, uniq
     await message.answer(
         summary_text,
         parse_mode="HTML",
+        link_preview_options=get_preview(),
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ᴍᴀɪɴ ᴍᴇɴᴜ", callback_data="menu:main")]
+            [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ᴍᴀɪɴ ᴍᴇɴᴜ", callback_data="menu:main")]
         ])
     )
     await state.clear()
-
 
 @router.message(AddAccountStates.waiting_for_string_or_file)
 async def process_string_or_file_upload(message: Message, state: FSMContext):
@@ -513,33 +545,30 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
     file_path_to_clean = None
 
     try:
-        # Handle document/file upload
         if message.document:
             file_id = message.document.file_id
             file_name = message.document.file_name or ""
             
-            # Create a secure temp directory
             temp_dir = Path("temp_uploads")
             temp_dir.mkdir(exist_ok=True)
             dest_path = temp_dir / f"uploaded_{message.from_user.id}_{file_name}"
             file_path_to_clean = dest_path
             
-            # Download file
             bot_obj = message.bot
             await bot_obj.download(file_id, destination=str(dest_path))
             
             if file_name.lower().endswith(".zip"):
-                status_msg = await message.answer("⚙️ ᴇxᴛʀᴀᴄᴛɪɴɢ ᴀɴᴅ ᴘᴀʀsɪɴɢ <code>.zip</code> ᴀʀᴄʜɪᴠᴇ...", parse_mode="HTML")
+                status_msg = await message.answer(
+                    "⚙️ <b>ᴇxᴛʀᴀᴄᴛɪɴɢ ᴀɴᴅ ᴘᴀʀsɪɴɢ</b> <code>.zip</code> <b>ᴀʀᴄʜɪᴠᴇ...</b>", 
+                    parse_mode="HTML",
+                    link_preview_options=get_preview()
+                )
                 zip_extract_dir = temp_dir / f"extracted_{message.from_user.id}_{os.urandom(4).hex()}"
                 try:
-                    # Create a secure temp directory for zip extraction
                     zip_extract_dir.mkdir(exist_ok=True, parents=True)
-                    
-                    # Extract zip with secure in-memory Zip Slip path traversal protection
                     with zipfile.ZipFile(dest_path, 'r') as zip_ref:
                         safe_members = []
                         for member in zip_ref.infolist():
-                            # Prevent directory traversal vulnerability (Zip Slip)
                             filename = member.filename
                             normalized = filename.replace("\\", "/")
                             if normalized.startswith("/") or ".." in normalized.split("/"):
@@ -548,26 +577,21 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                             safe_members.append(member)
                         zip_ref.extractall(zip_extract_dir, members=safe_members)
                         
-                    # We will collect all potential session strings and their sources
-                    sessions_to_import = [] # list of tuples: (session_string, source_name)
-                    all_found_files = [] # list of tuples: (file_name, size)
-                    parsing_errors = [] # list of strings
+                    sessions_to_import = []
+                    all_found_files = []
+                    parsing_errors = []
                     
-                    # Recursively walk through the extracted files using highly reliable os.walk
                     for root, dirs, files in os.walk(zip_extract_dir):
                         for file in files:
                             p = Path(root) / file
                             file_size = p.stat().st_size if p.exists() else 0
                             all_found_files.append((p.name, file_size))
                             if p.suffix.lower() == ".session":
-                                # Treat as a physical file, don't try to read it
                                 sessions_to_import.append(("file", p.stem, p.name, str(p.parent)))
                             else:
-                                # Treat any non-.session file as a text candidate to find potential session strings
                                 try:
                                     with open(p, "r", encoding="utf-8", errors="ignore") as f:
                                         content = f.read()
-                                    # Use a regex to find all potential base64 strings of length >= 100 including standard and url-safe characters
                                     found_strings = re.findall(r"[a-zA-Z0-9+\-_=/]{100,}", content)
                                     if found_strings:
                                         for s in found_strings:
@@ -600,30 +624,27 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                         await status_msg.edit_text(
                             error_details,
                             parse_mode="HTML",
-                            reply_markup=get_back_keyboard()
+                            reply_markup=get_back_keyboard(),
+                            link_preview_options=get_preview()
                         )
                         return
                     
-                    # Deduplicate sessions_to_import based on session data
                     unique_sessions = []
                     seen_strings = set()
                     for s_type, s_data, s_name, s_workdir in sessions_to_import:
-                        # For files, deduplicate by the full path (s_workdir + s_data)
-                        # For strings, deduplicate by the string itself
                         dedup_key = f"{s_workdir}/{s_data}" if s_type == "file" else s_data
                         if dedup_key not in seen_strings:
                             seen_strings.add(dedup_key)
                             unique_sessions.append((s_type, s_data, s_name, s_workdir))
                     
                     success_count = 0
-                    expired_sessions = []  # list of tuples: (source_name, error_reason)
-                    other_failed_sessions = [] # list of tuples: (source_name, error_reason)
+                    expired_sessions = []
+                    other_failed_sessions = []
                     
                     import time
                     total_sessions = len(unique_sessions)
                     last_edit_time = time.time()
                     
-                    # Define an inline progress bar helper
                     def make_progress_bar(current: int, total: int) -> str:
                         if total <= 0:
                             return "░" * 10
@@ -633,7 +654,6 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                         return f"<code>[{bar}]</code> <b>{pct}%</b>"
                     
                     for i, (s_type, s_data, source_name, s_workdir) in enumerate(unique_sessions, 1):
-                        # Throttle live updates to prevent hitting Telegram API rate limits (flood waits)
                         now_time = time.time()
                         if i == 1 or i == total_sessions or (now_time - last_edit_time >= 1.5):
                             progress_text = (
@@ -647,7 +667,7 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                                 f"⚡ <i>Processing: {html.escape(source_name)}...</i>"
                             )
                             try:
-                                await status_msg.edit_text(progress_text, parse_mode="HTML")
+                                await status_msg.edit_text(progress_text, parse_mode="HTML", link_preview_options=get_preview())
                                 last_edit_time = now_time
                             except Exception as edit_err:
                                 logger.warning(f"Failed to edit progress status: {edit_err}")
@@ -656,7 +676,6 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                         temp_name = f"uploaded_sess_zip_{message.from_user.id}_{i}"
 
                         if s_type == "file":
-                            # 🚀 MODIFIED: Use our custom converter instead of passing workdir to Client
                             session_file_path = os.path.join(s_workdir, f"{s_data}.session")
                             try:
                                 converted_str = parse_sqlite_to_pyrogram_string(session_file_path, API_ID)
@@ -666,7 +685,6 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                                 other_failed_sessions.append((source_name, f"DB Error: {e}"))
                                 continue
                         else:
-                            # For strings, normalize and use existing helper
                             s_data = normalize_session_string(s_data)
                             client = create_pyrogram_client(session_name=temp_name, session_string=s_data, proxy=proxy)
                             
@@ -694,10 +712,7 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                             name_parts = [first, last]
                             profile_name = " ".join([p for p in name_parts if p.strip()]) or me.username or "ᴜɴᴋɴᴏᴡɴ"
                             
-                            # Get session string to store it uniformly in DB
                             exported_session_str = await client.export_session_string()
-                            
-                            # Encrypt and save securely
                             encrypted_session = encrypt_data(exported_session_str)
                             await client.stop()
                             
@@ -731,7 +746,6 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                             except:
                                 pass
                                 
-                    # Prepare final summary message
                     summary_text = (
                         "📦 <b>ʙᴜʟᴋ ɪᴍᴘᴏʀᴛ sᴜᴍᴍᴀʀʏ</b>\n"
                         "━━━━━━━━━━━━━━━━━━━━━\n"
@@ -756,8 +770,9 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                     await message.answer(
                         summary_text,
                         parse_mode="HTML",
+                        link_preview_options=get_preview(),
                         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                            [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ᴍᴀɪɴ ᴍᴇɴᴜ", callback_data="menu:main")]
+                            [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ᴍᴀɪɴ ᴍᴇɴᴜ", callback_data="menu:main")]
                         ])
                     )
                     await state.clear()
@@ -765,26 +780,25 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                 except Exception as zip_err:
                     logger.exception("Error processing ZIP file")
                     await status_msg.edit_text(
-                        f"❌ <b><b>ꜰᴀɪʟᴇᴅ ᴛᴏ ᴘʀᴏᴄᴇss ᴢɪᴘ:</b></b> <code>{html.escape(str(zip_err))}</code>",
+                        f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ᴘʀᴏᴄᴇss ᴢɪᴘ:</b> <code>{html.escape(str(zip_err))}</code>",
                         parse_mode="HTML",
+                        link_preview_options=get_preview(),
                         reply_markup=get_back_keyboard()
                     )
                     return
                 finally:
-                    # Always clean up extracted files
                     if zip_extract_dir.exists():
                         try:
                             shutil.rmtree(zip_extract_dir)
-                        except Exception as clean_err:
-                            logger.error(f"Failed to clean up extracted ZIP dir: {clean_err}")
+                        except Exception:
+                            pass
                             
             elif file_name.lower().endswith(".session"):
-                status_msg = await message.answer("⚙️ ᴘᴀʀsɪɴɢ sǫʟɪᴛᴇ <code>.session</code> ꜰɪʟᴇ...", parse_mode="HTML")
+                status_msg = await message.answer("⚙️ <b>ᴘᴀʀsɪɴɢ sǫʟɪᴛᴇ</b> <code>.session</code> <b>ꜰɪʟᴇ...</b>", parse_mode="HTML", link_preview_options=get_preview())
                 try:
                     session_db_name = dest_path.stem
                     proxy, proxy_error = get_random_proxy()
 
-                    # 🚀 MODIFIED: Replaced huge manual SQLite block with our new clean converter
                     try:
                         session_str = parse_sqlite_to_pyrogram_string(str(dest_path), API_ID)
                         temp_name = f"sess_telethon_{message.from_user.id}"
@@ -799,7 +813,6 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                         raise ValueError("Could not retrieve account identity from get_me()")
                     phone = getattr(me, "phone_number", None)
                     if not phone:
-                        # Extract the phone number directly from the uploaded file's name as a fallback
                         import re
                         phone_match = re.search(r'\d+', session_db_name)
                         if phone_match:
@@ -816,10 +829,7 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                     name_parts = [first, last]
                     profile_name = " ".join([p for p in name_parts if p.strip()]) or me.username or "ᴜɴᴋɴᴏᴡɴ"
                     
-                    # Get session string to store it uniformly in DB
                     session_str_final = await client.export_session_string()
-
-                    # Encrypt and save securely
                     encrypted_session = encrypt_data(session_str_final)
                     await client.stop()
                     
@@ -841,8 +851,9 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                             f"🌐 <b>ʙᴏᴜɴᴅ ᴘʀᴏxʏ:</b> {proxy_info}\n\n"
                             f"ʏᴏᴜ ᴄᴀɴ ɴᴏᴡ ᴍᴀɴᴀɢᴇ ᴛʜɪs sᴇssɪᴏɴ inside the account panel.",
                             parse_mode="HTML",
+                            link_preview_options=get_preview(),
                             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                                [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ᴍᴀɪɴ ᴍᴇɴᴜ", callback_data="menu:main")]
+                                [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ᴍᴀɪɴ ᴍᴇɴᴜ", callback_data="menu:main")]
                             ])
                         )
                         await state.clear()
@@ -850,6 +861,7 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                         await message.answer(
                             "❌ <b>ᴇʀʀᴏʀ ᴏᴄᴄᴜʀʀᴇᴅ ᴡʜɪʟᴇ sᴀᴠɪɴɢ ᴛᴏ ᴍᴏɴɢᴏᴅʙ. ᴘʟᴇᴀsᴇ ᴄʜᴇᴄᴋ ʟᴏɢs.</b>",
                             parse_mode="HTML",
+                            link_preview_options=get_preview(),
                             reply_markup=get_back_keyboard()
                         )
                     return
@@ -859,6 +871,7 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                     await message.answer(
                         f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ᴘᴀʀsɪɴɢ sǫʟɪᴛᴇ sᴇssɪᴏɴ:</b> <code>{html.escape(str(db_err))}</code>",
                         parse_mode="HTML",
+                        link_preview_options=get_preview(),
                         reply_markup=get_back_keyboard()
                     )
                     try:
@@ -867,11 +880,9 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                         pass
                     return
             else:
-                # Text or txt file containing session string
                 try:
                     with open(dest_path, "r", encoding="utf-8", errors="ignore") as f:
                         content = f.read().strip()
-                    # Extract the first matching valid-looking base64 session string
                     found_strings = re.findall(r"[a-zA-Z0-9+\-_=/]{100,}", content)
                     if found_strings:
                         session_str = found_strings[0]
@@ -881,13 +892,13 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                     await message.answer(
                         f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ʀᴇᴀᴅ ꜰɪʟᴇ:</b> <code>{html.escape(str(text_err))}</code>",
                         parse_mode="HTML",
+                        link_preview_options=get_preview(),
                         reply_markup=get_back_keyboard()
                     )
                     return
                     
         elif message.text:
             content = message.text.strip()
-            # Extract the first matching valid-looking base64 session string
             found_strings = re.findall(r"[a-zA-Z0-9+\-_=/]{100,}", content)
             if found_strings:
                 session_str = found_strings[0]
@@ -897,6 +908,7 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
             await message.answer(
                 "⚠️ <b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ sᴇssɪᴏɴ sᴛʀɪɴɢ ᴏʀ ᴜᴘʟᴏᴀᴅ ᴀ ꜰɪʟᴇ.</b>",
                 parse_mode="HTML",
+                link_preview_options=get_preview(),
                 reply_markup=get_back_keyboard()
             )
             return
@@ -905,17 +917,15 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
             await message.answer(
                 "⚠️ <b>ᴛʜᴇ sᴇssɪᴏɴ sᴛʀɪɴɢ ᴄᴏᴜʟᴅ ɴᴏᴛ ʙᴇ ᴇxᴛʀᴀᴄᴛᴇᴅ.</b> ᴘʟᴇᴀsᴇ ᴍᴀᴋᴇ sᴜʀᴇ ʏᴏᴜ sᴇɴᴛ ᴀ ɴᴏɴ-ᴇᴍᴘᴛʏ value.",
                 parse_mode="HTML",
+                link_preview_options=get_preview(),
                 reply_markup=get_back_keyboard()
             )
             return
             
         session_str = normalize_session_string(session_str)
-        
-        # Attempt to validate and authorize the session string
-        status_msg = await message.answer("⏳ <b>ᴄᴏɴɴᴇᴄᴛɪɴɢ ᴛᴏ ᴛᴇʟᴇɢʀᴀᴍ sᴇʀᴠᴇʀs ᴜsɪɴɢ ᴘʀᴏᴠɪᴅᴇᴅ sᴇssɪᴏɴ...</b>", parse_mode="HTML")
+        status_msg = await message.answer("⏳ <b>ᴄᴏɴɴᴇᴄᴛɪɴɢ ᴛᴏ ᴛᴇʟᴇɢʀᴀᴍ sᴇʀᴠᴇʀs ᴜsɪɴɢ ᴘʀᴏᴠɪᴅᴇᴅ sᴇssɪᴏɴ...</b>", parse_mode="HTML", link_preview_options=get_preview())
         proxy, proxy_error = get_random_proxy()
         
-        # Instantiate in-memory client
         temp_name = f"uploaded_sess_{message.from_user.id}"
         client = create_pyrogram_client(session_name=temp_name, session_string=session_str, proxy=proxy)
         
@@ -926,10 +936,8 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                 raise ValueError("Could not retrieve account identity from get_me()")
             phone = getattr(me, "phone_number", None)
             if not phone:
-                # Fallback format: + followed by digits, or some representation
                 phone = f"+{me.id}"
             else:
-                # Ensure country code format
                 if not phone.startswith("+"):
                     phone = f"+{phone}"
                     
@@ -939,8 +947,8 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
             name_parts = [first, last]
             profile_name = " ".join([p for p in name_parts if p.strip()]) or me.username or "ᴜɴᴋɴᴏᴡɴ"
             
-            # Encrypt and save securely
-            encrypted_session = encrypt_data(session_str)
+            exported_session_str = await client.export_session_string()
+            encrypted_session = encrypt_data(exported_session_str)
             await client.stop()
             
             success = await save_account(
@@ -963,8 +971,9 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                     f"🌐 <b>ʙᴏᴜɴᴅ ᴘʀᴏxʏ:</b> {proxy_info}\n\n"
                     f"ʏᴏᴜ ᴄᴀɴ ɴᴏᴡ ᴍᴀɴᴀɢᴇ ᴛʜɪs sᴇssɪᴏɴ inside the account panel.",
                     parse_mode="HTML",
+                    link_preview_options=get_preview(),
                     reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                        [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ᴍᴀɪɴ ᴍᴇɴᴜ", callback_data="menu:main")]
+                        [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ᴍᴀɪɴ ᴍᴇɴᴜ", callback_data="menu:main")]
                     ])
                 )
                 await state.clear()
@@ -972,6 +981,7 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                 await message.answer(
                     "❌ <b>ᴇʀʀᴏʀ ᴏᴄᴄᴜʀʀᴇᴅ ᴡʜɪʟᴇ sᴀᴠɪɴɢ ᴛᴏ ᴍᴏɴɢᴏᴅʙ. ᴘʟᴇᴀsᴇ ᴄʜᴇᴄᴋ ʟᴏɢs.</b>",
                     parse_mode="HTML",
+                    link_preview_options=get_preview(),
                     reply_markup=get_back_keyboard()
                 )
         except Exception as conn_err:
@@ -981,6 +991,7 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
                 f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ᴀᴜᴛʜᴏʀɪᴢᴇ sᴇssɪᴏɴ:</b> <code>{html.escape(str(conn_err))}</code>\n\n"
                 "👉 Please ensure your session is alive and valid.",
                 parse_mode="HTML",
+                link_preview_options=get_preview(),
                 reply_markup=get_back_keyboard()
             )
             try:
@@ -997,28 +1008,30 @@ async def process_string_or_file_upload(message: Message, state: FSMContext):
 @router.message(AddAccountStates.waiting_for_phone)
 async def process_phone(message: Message, state: FSMContext):
     if not message.text:
-        await message.answer("⚠️ ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ᴘʜᴏɴᴇ ɴᴜᴍʙᴇʀ.", reply_markup=get_back_keyboard())
+        await message.answer("⚠️ <b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ᴘʜᴏɴᴇ ɴᴜᴍʙᴇʀ.</b>", parse_mode="HTML", reply_markup=get_back_keyboard(), link_preview_options=get_preview())
         return
     phone = message.text.strip().replace(" ", "")
     if not re.match(r"^\+\d{8,15}$", phone):
         await message.answer(
             "⚠️ <b>ɪɴᴠᴀʟɪᴅ ᴘʜᴏɴᴇ ꜰᴏʀᴍᴀᴛ.</b> ᴘʟᴇᴀsᴇ ᴇɴᴛᴇʀ ᴡɪᴛʜ ᴄᴏᴜɴᴛʀʏ ᴄᴏᴅᴇ (ᴇ.ɢ. <code>+1234567890</code>):",
             parse_mode="HTML",
+            link_preview_options=get_preview(),
             reply_markup=get_back_keyboard()
         )
         return
     proxy, proxy_error = get_random_proxy()
     if not proxy:
-        warning_msg = "⚠️ ɴᴏ sᴏᴄᴋs5 ᴘʀᴏxɪᴇs ᴄᴏɴꜰɪɢᴜʀᴇᴅ. ᴘʀᴏᴄᴇᴇᴅɪɴɢ ᴡɪᴛʜ ᴅɪʀᴇᴄᴛ ᴄᴏɴɴᴇᴄᴛɪᴏɴ."
+        warning_msg = "⚠️ <b>ɴᴏ sᴏᴄᴋs5 ᴘʀᴏxɪᴇs ᴄᴏɴꜰɪɢᴜʀᴇᴅ. ᴘʀᴏᴄᴇᴇᴅɪɴɢ ᴡɪᴛʜ ᴅɪʀᴇᴄᴛ ᴄᴏɴɴᴇᴄᴛɪᴏɴ.</b>"
         logger.warning(f"No proxy configured: {proxy_error}")
-        await message.answer(warning_msg, parse_mode="HTML")
+        await message.answer(warning_msg, parse_mode="HTML", link_preview_options=get_preview())
     else:
         success_msg = f"🌐 <b>ᴘʀᴏxʏ sᴇʟᴇᴄᴛᴇᴅ:</b> <code>{html.escape(proxy['hostname'])}:{proxy['port']}</code>. ᴄᴏɴɴᴇᴄᴛɪɴɢ..."
-        await message.answer(success_msg, parse_mode="HTML")
+        await message.answer(success_msg, parse_mode="HTML", link_preview_options=get_preview())
         
     status_msg = await message.answer(
-        "⏳ <b><b>ᴄᴏɴɴᴇᴄᴛɪɴɢ ᴛᴏ ᴛᴇʟᴇɢʀᴀᴍ sᴇʀᴠᴇʀs &amp; ɢᴇɴᴇʀᴀᴛɪɴɢ ᴏᴛᴘ... ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ.</b></b>",
+        "⏳ <b>ᴄᴏɴɴᴇᴄᴛɪɴɢ ᴛᴏ ᴛᴇʟᴇɢʀᴀᴍ sᴇʀᴠᴇʀs &amp; ɢᴇɴᴇʀᴀᴛɪɴɢ ᴏᴛᴘ... ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ.</b>",
         parse_mode="HTML",
+        link_preview_options=get_preview(),
         reply_markup=get_back_keyboard()
     )
     try:
@@ -1034,9 +1047,10 @@ async def process_phone(message: Message, state: FSMContext):
             proxy=proxy
         )
         await message.answer(
-            f"📨 <b>ᴛᴇʟᴇɢʀᴀᴍ sᴇɴᴛ ᴀ ʟᴏɢɪɴ ᴏᴛᴘ/ᴄᴏᴅᴇ</b> ᴛᴏ {html.escape(phone)}.\n"
+            f"📨 <b>ᴛᴇʟᴇɢʀᴀᴍ sᴇɴᴛ ᴀ ʟᴏɢɪɴ ᴏᴛᴘ/ᴄᴏᴅᴇ</b> ᴛᴏ <code>{html.escape(phone)}</code>.\n"
             "ᴘʟᴇᴀsᴇ ᴄʜᴇᴄᴋ ʏᴏᴜʀ ᴏꜰꜰɪᴄɪᴀʟ ᴛᴇʟᴇɢʀᴀᴍ ᴀᴘᴘ ᴏʀ sᴍs ᴀɴᴅ ᴇɴᴛᴇʀ ᴛʜᴇ ᴄᴏᴅᴇ ʜᴇʀᴇ:",
             parse_mode="HTML",
+            link_preview_options=get_preview(),
             reply_markup=get_back_keyboard()
         )
         await state.set_state(AddAccountStates.waiting_for_otp)
@@ -1045,6 +1059,7 @@ async def process_phone(message: Message, state: FSMContext):
         await message.answer(
             f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ɪɴɪᴛɪᴀᴛᴇ ʟᴏɢɪɴ sᴇssɪᴏɴ:</b> <code>{html.escape(str(e))}</code>",
             parse_mode="HTML",
+            link_preview_options=get_preview(),
             reply_markup=get_back_keyboard()
         )
         await state.clear()
@@ -1052,7 +1067,7 @@ async def process_phone(message: Message, state: FSMContext):
 @router.message(AddAccountStates.waiting_for_otp)
 async def process_otp(message: Message, state: FSMContext):
     if not message.text:
-        await message.answer("⚠️ ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ᴏᴛᴘ.", reply_markup=get_back_keyboard())
+        await message.answer("⚠️ <b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ ᴏᴛᴘ.</b>", parse_mode="HTML", reply_markup=get_back_keyboard(), link_preview_options=get_preview())
         return
     otp = message.text.strip().replace(" ", "")
     data = await state.get_data()
@@ -1064,12 +1079,13 @@ async def process_otp(message: Message, state: FSMContext):
         await message.answer(
             "❌ <b>sᴇssɪᴏɴ ᴇxᴘɪʀᴇᴅ. ᴘʟᴇᴀsᴇ sᴛᴀʀᴛ ᴏᴠᴇʀ.</b>",
             parse_mode="HTML",
+            link_preview_options=get_preview(),
             reply_markup=get_back_keyboard()
         )
         await state.clear()
         return
         
-    await message.answer("⏳ <b>ᴠᴇʀɪꜰʏɪɴɢ ᴏᴛᴘ...</b>", parse_mode="HTML")
+    await message.answer("⏳ <b>ᴠᴇʀɪꜰʏɪɴɢ ᴏᴛᴘ...</b>", parse_mode="HTML", link_preview_options=get_preview())
     try:
         await client.sign_in(phone, phone_code_hash, otp)
         await finalize_account_registration(message, state, client, phone, proxy)
@@ -1078,6 +1094,7 @@ async def process_otp(message: Message, state: FSMContext):
             "🔐 <b>ᴛᴡᴏ-ꜰᴀᴄᴛᴏʀ ᴀᴜᴛʜᴇɴᴛɪᴄᴀᴛɪᴏɴ (2ꜰᴀ) ɪs ᴇɴᴀʙʟᴇᴅ</b> ᴏɴ ᴛʜɪs ᴀᴄᴄᴏᴜɴᴛ.\n"
             "ᴘʟᴇᴀsᴇ ᴇɴᴛᴇʀ ʏᴏᴜʀ ᴄʟᴏᴜᴅ ᴘᴀssᴡᴏʀᴅ ʙᴇʟᴏᴡ:",
             parse_mode="HTML",
+            link_preview_options=get_preview(),
             reply_markup=get_back_keyboard()
         )
         await state.set_state(AddAccountStates.waiting_for_2fa)
@@ -1085,12 +1102,14 @@ async def process_otp(message: Message, state: FSMContext):
         await message.answer(
             "❌ <b>ɪɴᴠᴀʟɪᴅ ʟᴏɢɪɴ ᴄᴏᴅᴇ.</b> ᴘʟᴇᴀsᴇ ᴇɴᴛᴇʀ ᴛʜᴇ ᴄᴏʀʀᴇᴄᴛ ᴄᴏᴅᴇ:",
             parse_mode="HTML",
+            link_preview_options=get_preview(),
             reply_markup=get_back_keyboard()
         )
     except PhoneCodeExpired:
         await message.answer(
             "❌ <b>ʟᴏɢɪɴ ᴄᴏᴅᴇ ʜᴀs ᴇxᴘɪʀᴇᴅ. ᴘʟᴇᴀsᴇ ʀᴇsᴛᴀʀᴛ ᴛʜᴇ ᴘʀᴏᴄᴇss.</b>",
             parse_mode="HTML",
+            link_preview_options=get_preview(),
             reply_markup=get_back_keyboard()
         )
         await client.stop()
@@ -1100,6 +1119,7 @@ async def process_otp(message: Message, state: FSMContext):
         await message.answer(
             f"❌ <b>ᴀɴ ᴇʀʀᴏʀ ᴏᴄᴄᴜʀʀᴇᴅ:</b> <code>{html.escape(str(e))}</code>",
             parse_mode="HTML",
+            link_preview_options=get_preview(),
             reply_markup=get_back_keyboard()
         )
         await client.stop()
@@ -1108,7 +1128,7 @@ async def process_otp(message: Message, state: FSMContext):
 @router.message(AddAccountStates.waiting_for_2fa)
 async def process_2fa(message: Message, state: FSMContext):
     if not message.text:
-        await message.answer("⚠️ ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ 2ꜰᴀ ᴄʟᴏᴜᴅ ᴘᴀssᴡᴏʀᴅ.", reply_markup=get_back_keyboard())
+        await message.answer("⚠️ <b>ᴘʟᴇᴀsᴇ sᴇɴᴅ ᴀ ᴠᴀʟɪᴅ 2ꜰᴀ ᴄʟᴏᴜᴅ ᴘᴀssᴡᴏʀᴅ.</b>", parse_mode="HTML", reply_markup=get_back_keyboard(), link_preview_options=get_preview())
         return
     password = message.text.strip()
     data = await state.get_data()
@@ -1119,12 +1139,13 @@ async def process_2fa(message: Message, state: FSMContext):
         await message.answer(
             "❌ <b>sᴇssɪᴏɴ ᴇxᴘɪʀᴇᴅ. ᴘʟᴇᴀsᴇ sᴛᴀʀᴛ ᴏᴠᴇʀ.</b>",
             parse_mode="HTML",
+            link_preview_options=get_preview(),
             reply_markup=get_back_keyboard()
         )
         await state.clear()
         return
         
-    await message.answer("⏳ <b><b>ᴄʜᴇᴄᴋɪɴɢ 2ꜰᴀ ᴄʟᴏᴜᴅ ᴘᴀssᴡᴏʀᴅ...</b></b>", parse_mode="HTML")
+    await message.answer("⏳ <b>ᴄʜᴇᴄᴋɪɴɢ 2ꜰᴀ ᴄʟᴏᴜᴅ ᴘᴀssᴡᴏʀᴅ...</b>", parse_mode="HTML", link_preview_options=get_preview())
     try:
         await client.check_password(password)
         await finalize_account_registration(message, state, client, phone, proxy)
@@ -1133,6 +1154,7 @@ async def process_2fa(message: Message, state: FSMContext):
         await message.answer(
             "❌ <b>ɪɴᴠᴀʟɪᴅ 2ꜰᴀ ᴄʟᴏᴜᴅ ᴘᴀssᴡᴏʀᴅ.</b> ᴘʟᴇᴀsᴇ ᴛʀʏ ᴀɢᴀɪɴ:",
             parse_mode="HTML",
+            link_preview_options=get_preview(),
             reply_markup=get_back_keyboard()
         )
 
@@ -1165,19 +1187,21 @@ async def finalize_account_registration(message: Message, state: FSMContext, cli
             proxy_info = f"<code>{html.escape(proxy['hostname'])}:{proxy['port']}</code>" if proxy else "ɴᴏɴᴇ (ᴅɪʀᴇᴄᴛ)"
             await message.answer(
                 f"✅ <b>ᴀᴄᴄᴏᴜɴᴛ ᴀᴅᴅᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ!</b>\n\n"
-                f"📱 <b><b>ᴘʜᴏɴᴇ:</b></b> <code>{html.escape(phone)}</code>\n"
+                f"📱 <b>ᴘʜᴏɴᴇ:</b> <code>{html.escape(phone)}</code>\n"
                 f"🔒 <b>sᴇssɪᴏɴ sᴛʀɪɴɢ:</b> ᴇɴᴄʀʏᴘᴛᴇᴅ &amp; sᴀᴠᴇᴅ sᴇᴄᴜʀᴇʟʏ.\n"
                 f"🌐 <b>ʙᴏᴜɴᴅ ᴘʀᴏxʏ:</b> {proxy_info}\n\n"
                 f"ʏᴏᴜ ᴄᴀɴ ɴᴏᴡ ʀᴇᴛʀɪᴇᴠᴇ ᴏᴛᴘ ꜰᴏʀ ʟᴏɢɪɴ ᴜsɪɴɢ ᴛʜᴇ ɪɴʟɪɴᴇ ᴘᴀɴᴇʟ.",
                 parse_mode="HTML",
+                link_preview_options=get_preview(),
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="🔙 ʙᴀᴄᴋ ᴛᴏ ᴍᴀɪɴ ᴍᴇɴᴜ", callback_data="menu:main")]
+                    [InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ᴍᴀɪɴ ᴍᴇɴᴜ", callback_data="menu:main")]
                 ])
             )
         else:
             await message.answer(
                 "❌ <b>ᴇʀʀᴏʀ ᴏᴄᴄᴜʀʀᴇᴅ ᴡʜɪʟᴇ sᴀᴠɪɴɢ ᴛᴏ ᴍᴏɴɢᴏᴅʙ. ᴘʟᴇᴀsᴇ ᴄʜᴇᴄᴋ ʟᴏɢs.</b>",
                 parse_mode="HTML",
+                link_preview_options=get_preview(),
                 reply_markup=get_back_keyboard()
             )
     except Exception as e:
@@ -1185,6 +1209,7 @@ async def finalize_account_registration(message: Message, state: FSMContext, cli
         await message.answer(
             f"❌ <b>ꜰᴀɪʟᴇᴅ ᴛᴏ ꜰɪɴᴀʟɪᴢᴇ ᴀᴄᴄᴏᴜɴᴛ:</b> <code>{html.escape(str(e))}</code>",
             parse_mode="HTML",
+            link_preview_options=get_preview(),
             reply_markup=get_back_keyboard()
         )
         try:
