@@ -23,7 +23,7 @@ import asyncio
 import random
 from aiogram import Router, F, types
 from aiogram.filters import Command
-from aiogram.types import Message, LinkPreviewOptions, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
+from aiogram.types import Message, LinkPreviewOptions, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from database.methods import delete_all_accounts
 from database.connection import db
 from config import OWNER_ID
@@ -57,9 +57,6 @@ STICKERS = [
 ]
 
 def get_main_keyboard() -> InlineKeyboardMarkup:
-    """
-    generates next-level dashboard keyboard filled with beautiful inline buttons arranged vertically.
-    """
     keyboard = [
         [
             InlineKeyboardButton(text="ᴀᴅᴅ ᴀᴄᴄᴏᴜɴᴛ", callback_data="menu:add_account"),
@@ -75,34 +72,30 @@ def get_main_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 def get_back_keyboard() -> InlineKeyboardMarkup:
-    """
-    returns standard back to menu inline keyboard.
-    """
     keyboard = [[InlineKeyboardButton(text="ʙᴀᴄᴋ ᴛᴏ ᴍᴀɪɴ ᴍᴇɴᴜ", callback_data="menu:main")]]
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
-def get_welcome_text() -> str:
+def get_welcome_text(first_name: str, user_id: int) -> str:
     """
-    returns beautifully designed welcome text in lowercase small caps.
+    Returns dynamically generated welcome text with blockquotes and an expandable quote.
     """
+    safe_name = first_name.replace("<", "&lt;").replace(">", "&gt;")
+    
     welcome_text = (
-        "👋 <b>ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ᴀᴅᴠᴀɴᴄᴇᴅ ᴛᴇʟᴇɢʀᴀᴍ ɪᴅ sᴛᴏʀᴀɢᴇ ʙᴏᴛ!</b>\n\n"
-        "⚡ ᴛʜɪs ɴᴇxᴛ-ʟᴇᴠᴇʟ ᴅᴀsʜʙᴏᴀʀᴅ ʟᴇᴛs ʏᴏᴜ ᴇᴀsɪʟʏ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ᴀᴄᴄᴏᴜɴᴛs ᴇɴᴛɪʀᴇʟʏ ᴠɪᴀ ɪɴʟɪɴᴇ ʙᴜᴛᴛᴏɴs. ɴᴏ ᴄᴏᴍᴍᴀɴᴅs ɴᴇᴇᴅᴇᴅ!\n\n"
-        "🛡️ ᴀʟʟ sᴛʀɪɴɢ sᴇssɪᴏɴs ᴀʀᴇ ꜰᴜʟʟʏ ᴇɴᴄʀʏᴘᴛᴇᴅ ᴜsɪɴɢ ᴀᴇs-256 ʜʏʙʀɪᴅ sᴇᴄᴜʀɪᴛʏ.\n\n"
-        "👤 <b>ᴅᴇᴠᴇʟᴏᴘᴇʀ ᴄʀᴇᴅɪᴛ:</b> ᴅᴇᴠᴇʟᴏᴘᴇᴅ ᴡɪᴛʜ ❤️ ʙʏ <a href=\"https://t.me/Unrated_Coder\">Unrated Coder</a>"
+        f"<blockquote>Heyy...! <b><a href=\"tg://user?id={user_id}\">{safe_name}</a></b> ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ᴀᴅᴠᴀɴᴄᴇᴅ ᴛᴇʟᴇɢʀᴀᴍ ɪᴅ sᴛᴏʀᴀɢᴇ ʙᴏᴛ!</blockquote>\n\n"
+        f"<blockquote expandable>⚡ ᴛʜɪs ɴᴇxᴛ-ʟᴇᴠᴇʟ ᴅᴀsʜʙᴏᴀʀᴅ ʟᴇᴛs ʏᴏᴜ ᴇᴀsɪʟʏ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ᴀᴄᴄᴏᴜɴᴛs ᴇɴᴛɪʀᴇʟʏ ᴠɪᴀ ɪɴʟɪɴᴇ ʙᴜᴛᴛᴏɴs. ɴᴏ ᴄᴏᴍᴍᴀɴᴅs ɴᴇᴇᴅᴇᴅ!\n\n"
+        f"🛡️ ᴀʟʟ sᴛʀɪɴɢ sᴇssɪᴏɴs ᴀʀᴇ ꜰᴜʟʟʏ ᴇɴᴄʀʏᴘᴛᴇᴅ ᴜsɪɴɢ ᴀᴇs-256 ʜʏʙʀɪᴅ sᴇᴄᴜʀɪᴛʏ.</blockquote>\n\n"
+        f"<blockquote><b>🍟 ᴅᴇᴠᴇʟᴏᴘᴇʀ ᴄʀᴇᴅɪᴛ:</b> ᴅᴇᴠᴇʟᴏᴘᴇᴅ ᴡɪᴛʜ ❤️ ʙʏ <a href=\"https://t.me/Unrated_coder\">Unrated Coder</a></blockquote>"
     )
     return welcome_text
 
 def get_help_text() -> str:
-    """
-    returns assistance instructions text in lowercase small caps.
-    """
     help_text = (
         "ℹ️ <b>ɪɴᴛᴇʀᴀᴄᴛɪᴠᴇ ʜᴇʟᴘ &amp; ᴅᴏᴄᴜᴍᴇɴᴛᴀᴛɪᴏɴ</b>\n\n"
         "➕ <b>ᴀᴅᴅ ᴀᴄᴄᴏᴜɴᴛ:</b>\n"
         "👉 ɢᴜɪᴅᴇs ʏᴏᴜ ᴛᴏ sᴇᴄᴜʀᴇʟʏ ᴄᴏɴɴᴇᴄᴛ ᴀɴʏ ᴛᴇʟᴇɢʀᴀᴍ ᴀᴄᴄᴏᴜɴᴛ sᴇssɪᴏɴ.\n\n"
         "📋 <b>ʟɪsᴛ ᴀᴄᴄᴏᴜɴᴛs:</b>\n"
-        "👉 ᴅɪsᴘʟᴀʏs ᴀ ᴘᴀɢɪɴᴀᴛᴇᴅ ᴠɪᴇᴡ (6 ᴘᴇʀ ᴘᴀɢᴇ) ᴏꜰ ʏᴏᴜʀ sᴇssɪᴏɴs, sᴜᴘᴘᴏʀᴛɪɴɢ:\n"
+        "👉 ᴅɪsᴘʟᴀʏs ᴀ ᴘᴀɢɪɴᴀᴛᴇᴅ ᴠɪᴇᴡ ᴏꜰ ʏᴏᴜʀ sᴇssɪᴏɴs, sᴜᴘᴘᴏʀᴛɪɴɢ:\n"
         "  • 📁 <b>ᴅᴇᴛᴀɪʟs:</b> ᴇsᴛɪᴍᴀᴛᴇs ᴄʀᴇᴀᴛɪᴏɴ ᴀɢᴇ ᴀɴᴅ views ᴘʀᴇᴍɪᴜᴍ/ʀᴇsᴛʀɪᴄᴛᴇᴅ/ᴛʀᴜsᴛ.\n"
         "  • ✔️ <b>ᴠᴇʀɪꜰʏ:</b> ᴄʜᴇᴄᴋs ɪꜰ sᴇssɪᴏɴ ɪs ᴀʟɪᴠᴇ ᴏɴ ᴛᴇʟᴇɢʀᴀᴍ sᴇʀᴠᴇʀs.\n"
         "  • ✉️ <b>sᴇɴᴅ:</b> sᴇɴᴅs ᴄᴜsᴛᴏᴍ ᴍᴇssᴀɢᴇs ᴛᴏ ɪᴅs, ᴜsᴇʀɴᴀᴍᴇs, ᴏʀ ʟɪɴᴋs.\n"
@@ -111,7 +104,7 @@ def get_help_text() -> str:
         "  • 💾 <b>ᴇxᴘᴏʀᴛ sǫʟɪᴛᴇ:</b> sᴇɴᴅs ʏᴏᴜ ᴀ ᴘʜʏsɪᴄᴀʟ <code>.session</code> sǫʟɪᴛᴇ ꜰɪʟᴇ.\n"
         "  • 🔐 <b>sᴇᴄᴜʀɪᴛʏ:</b> ᴍᴀɴᴀɢᴇs 2ꜰᴀ, renames ᴘʀᴏꜰɪʟᴇs, views &amp; revokes active sessions.\n"
         "  • 🗑️ <b>ᴅᴇʟᴇᴛᴇ:</b> ᴡɪᴘᴇs ᴛʜᴇ sᴇssɪᴏɴ ꜰʀᴏᴍ ᴛʜᴇ ʙᴏᴛ ᴅᴀᴛᴀʙᴀsᴇ.\n\n"
-        "👤 <b>ᴅᴇᴠᴇʟᴏᴘᴇʀ ᴄʀᴇᴅɪᴛ:</b> ᴅᴇᴠᴇʟᴏᴘᴇᴅ ᴡɪᴛʜ ❤️ ʙʏ <a href=\"https://t.me/Unrated_Coder\">Unrated Coder</a>"
+        "<blockquote><b>👤 ᴅᴇᴠᴇʟᴏᴘᴇʀ ᴄʀᴇᴅɪᴛ:</b> ᴅᴇᴠᴇʟᴏᴘᴇᴅ ᴡɪᴛʜ ❤️ ʙʏ <a href=\"https://t.me/Unrated_Coder\">Unrated Coder</a></blockquote>"
     )
     return help_text
 
@@ -145,26 +138,20 @@ async def send_welcome_cmd(message: Message):
 
     random_url = random.choice(IMAGES)
     await message.answer(
-        text=get_welcome_text(),
+        text=get_welcome_text(message.from_user.first_name, message.from_user.id),
         parse_mode="HTML",
         reply_markup=get_main_keyboard(),
-        link_preview_options=LinkPreviewOptions(url=random_url, prefer_large_media=True)
+        link_preview_options=LinkPreviewOptions(url=random_url, prefer_large_media=True, show_above_text=True)
     )
 
 @router.message(Command("help"))
 async def send_help(message: Message):
-    if getattr(message, "photo", None):
-        # We don't strictly need this but it's safe
-        pass
-    # The requirement is just for start.py but the prompt specifically says "When ANY user sends /start"
-    # For /help we just follow the old behavior but with an image because all bots send images for help too, maybe?
-    # Or just keep edit_text behavior. The memory says: "Every single image sent by the bot across the repo must have a spoiler applied (has_spoiler=True)."
-    # If it sends text only, it's fine.
+    random_url = random.choice(IMAGES)
     await message.answer(
         get_help_text(),
         parse_mode="HTML",
-        disable_web_page_preview=True,
-        reply_markup=get_back_keyboard()
+        reply_markup=get_back_keyboard(),
+        link_preview_options=LinkPreviewOptions(url=random_url, prefer_large_media=True, show_above_text=True)
     )
 
 @router.callback_query(F.data == "menu:remove_all_confirm")
@@ -175,22 +162,20 @@ async def remove_all_confirm_callback(callback_query: CallbackQuery):
         [InlineKeyboardButton(text="ᴄᴀɴᴄᴇʟ", callback_data="menu:main")]
     ])
 
-    # Since previous message could be photo or text, edit text / caption accordingly
     try:
         await callback_query.message.edit_text(
             "⚠️ <b>Are you sure you want to delete ALL saved sessions? This cannot be undone.</b>",
             parse_mode="HTML",
             reply_markup=keyboard,
-            link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
     except Exception:
-        # Fallback if it's currently a photo message
         await callback_query.message.delete()
         await callback_query.message.answer(
             "⚠️ <b>Are you sure you want to delete ALL saved sessions? This cannot be undone.</b>",
             parse_mode="HTML",
             reply_markup=keyboard,
-            link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
 
 @router.callback_query(F.data == "menu:remove_all_yes")
@@ -204,7 +189,7 @@ async def remove_all_yes_callback(callback_query: CallbackQuery):
             text,
             parse_mode="HTML",
             reply_markup=get_back_keyboard(),
-            link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
     except Exception:
         await callback_query.message.delete()
@@ -212,7 +197,7 @@ async def remove_all_yes_callback(callback_query: CallbackQuery):
             text,
             parse_mode="HTML",
             reply_markup=get_back_keyboard(),
-            link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
 
 @router.callback_query(F.data == "menu:main")
@@ -221,18 +206,18 @@ async def back_to_main_callback(callback_query: CallbackQuery):
 
     try:
         await callback_query.message.edit_text(
-            text=get_welcome_text(),
+            text=get_welcome_text(callback_query.from_user.first_name, callback_query.from_user.id),
             parse_mode="HTML",
             reply_markup=get_main_keyboard(),
-            link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
     except Exception:
         await callback_query.message.delete()
         await callback_query.message.answer(
-            text=get_welcome_text(),
+            text=get_welcome_text(callback_query.from_user.first_name, callback_query.from_user.id),
             parse_mode="HTML",
             reply_markup=get_main_keyboard(),
-            link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
 
 @router.callback_query(F.data == "menu:help")
@@ -244,7 +229,7 @@ async def help_callback(callback_query: CallbackQuery):
             get_help_text(),
             parse_mode="HTML",
             reply_markup=get_back_keyboard(),
-            link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
     except Exception:
         await callback_query.message.delete()
@@ -252,5 +237,5 @@ async def help_callback(callback_query: CallbackQuery):
             get_help_text(),
             parse_mode="HTML",
             reply_markup=get_back_keyboard(),
-            link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True)
+            link_preview_options=LinkPreviewOptions(url=random.choice(IMAGES), prefer_large_media=True, show_above_text=True)
         )
