@@ -24,6 +24,7 @@ from .add_account import router as add_account_router
 from .list_accounts import router as list_accounts_router
 from .login import router as login_router
 from .chat_manager import router as chat_manager_router
+from .admin import router as admin_router
 
 # List of all command routers to register
 all_routers = [
@@ -31,5 +32,6 @@ all_routers = [
     add_account_router,
     list_accounts_router,
     login_router,
-    chat_manager_router
+    chat_manager_router,
+    admin_router
 ]
